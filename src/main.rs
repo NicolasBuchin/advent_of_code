@@ -13,9 +13,18 @@ fn main() {
     reader.lines().map_while(Result::ok).for_each(|line| {
         let report: Vec<_> = line.split(' ').collect();
         let report: Vec<i32> = report.iter().map(|s| s.parse().unwrap()).collect();
-        let safe = is_safe(&report);
+        let mut safe = is_safe(&report);
         if safe {
             safe_count += 1;
+        } else {
+            (0..report.len()).for_each(|i| {
+                let mut mutated_report = report.clone();
+                mutated_report.remove(i);
+                safe |= is_safe(&mutated_report);
+            });
+            if safe {
+                safe_count += 1;
+            }
         }
         println!("report {:?} is safe ? {}", report, safe);
     });
