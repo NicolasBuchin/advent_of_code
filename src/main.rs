@@ -1,7 +1,6 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
-    ops::Sub,
 };
 
 fn main() {
@@ -10,19 +9,14 @@ fn main() {
     left_list.sort();
     right_list.sort();
 
-    let mut total = 0;
+    let mut sim = 0;
 
-    left_list.iter().enumerate().for_each(|(i, e)| {
-        let r = right_list[i];
-        let d = distance(*e, r);
-        println!("distance between {} and {} = {}", e, r, d);
-        total += d;
+    left_list.iter().for_each(|e| {
+        let s = similarity(*e, &right_list);
+        println!("similarity for {} = {}", e, s);
+        sim += s;
     });
-    println!("total distance = {} ", total);
-}
-
-fn distance(left: i32, right: i32) -> i32 {
-    left.sub(right).abs()
+    println!("total similarity = {} ", sim);
 }
 
 fn get_list_from_file(path: &str) -> (Vec<i32>, Vec<i32>) {
@@ -39,4 +33,8 @@ fn get_list_from_file(path: &str) -> (Vec<i32>, Vec<i32>) {
     });
 
     (left_list, right_list)
+}
+
+fn similarity(e: i32, right_list: &[i32]) -> i32 {
+    e.wrapping_mul(right_list.iter().filter(|&x| *x == e).count() as i32)
 }
