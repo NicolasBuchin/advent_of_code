@@ -1,49 +1,55 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
-    ops::Sub,
+    ops::Mul,
 };
 
 fn main() {
     let file = File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
 
-    let mut safe_count = 0;
+    let mul_total: i32 = reader.lines().flatten().map(|line| {
+        let indices: Vec<usize> = line.match_indices("mul").map(|(i,_)| i).collect();
+        let s: Vec<char> = line.chars().collect();
+        
+        indices.iter().filter_map(|&index| {
+            get_mul(index, &s)
+        }).sum::<i32>()
+    }).sum();
 
-    reader.lines().map_while(Result::ok).for_each(|line| {
-        let report: Vec<_> = line.split(' ').collect();
-        let report: Vec<i32> = report.iter().map(|s| s.parse().unwrap()).collect();
-        let mut safe = is_safe(&report);
-        if safe {
-            safe_count += 1;
-        } else {
-            (0..report.len()).for_each(|i| {
-                let mut mutated_report = report.clone();
-                mutated_report.remove(i);
-                safe |= is_safe(&mutated_report);
-            });
-            if safe {
-                safe_count += 1;
-            }
-        }
-        println!("report {:?} is safe ? {}", report, safe);
-    });
-
-    println!("total amount of safe reports = {} ", safe_count);
+    println!("result of all valid muls = {} ", mul_total);
 }
 
-fn is_safe(report: &[i32]) -> bool {
-    let ascending = report[0] < report[1];
+fn get_mul(index: usize, s: &[char]) -> Option<i32> {
+    let mut i = index + 3;
+    
+    if s[i] != '(' {
+        return None;
+    }
 
-    let mut prev = report[0];
-    let mut res = true;
+    i += 1;
+    let mut left = Vec::new();
+    while s[i].is_digit(10) {
+        left.push(s[i]);
+        i += 1;
+    }
 
-    report[1..].iter().for_each(|&x| {
-        if (ascending && (x <= prev)) || (!ascending && (x >= prev)) || (x.sub(prev).abs() > 3) {
-            res = false;
-        }
-        prev = x;
-    });
+    if s[i] != ',' {
+        return None;
+    }
 
-    res
+    i += 1;
+    let mut right = Vec::new();
+    while s[i].is_digit(10) {
+        right.push(s[i]);
+        i += 1;
+    }
+
+    if s[i] != ')' {
+        return None;
+    }
+
+    let x = left.into_iter().collect::<String>().parse::<i32>().unwrap();
+    let y = right.into_iter().collect::<String>().parse::<i32>().unwrap();
+    Some(x.mul(y))
 }
