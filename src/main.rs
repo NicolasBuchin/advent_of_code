@@ -1,42 +1,30 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::fs::{self};
 use std::time::Instant;
 
 fn main() {
+    let input = fs::read_to_string("input.txt").unwrap();
+
     let now = Instant::now();
 
-    let mut count = 0;
+    let puzzle = input.as_bytes();
+    let line_length = input.lines().next().unwrap().len() + 1;
 
-    let puzzle = BufReader::new(File::open("input.txt").unwrap())
-        .lines()
-        .map_while(Result::ok)
-        .collect::<Vec<_>>();
+    let count = puzzle
+        .iter()
+        .enumerate()
+        .filter(|(i, &c)| c == b'A' && check_x(*i, puzzle, line_length))
+        .count();
 
-    puzzle.iter().enumerate().for_each(|(y, l)| {
-        l.chars().enumerate().for_each(|(x, c)| {
-            if c == 'A' && check_x(x, y, &puzzle) {
-                count += 1;
-            }
-        })
-    });
+    println!("Elapsed: {:.2?}", now.elapsed());
 
-    let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed);
-
-    println!("count: {}", count);
+    println!("ok: {}", count == 1831);
 }
 
-fn check_x(x: usize, y: usize, puzzle: &[String]) -> bool {
-    x >= 1
-        && x + 1 < puzzle[y].len()
-        && y >= 1
-        && y + 1 < puzzle.len()
-        && ((puzzle[y + 1].chars().nth(x + 1) == Some('S')
-            && puzzle[y - 1].chars().nth(x - 1) == Some('M'))
-            || (puzzle[y + 1].chars().nth(x + 1) == Some('M')
-                && puzzle[y - 1].chars().nth(x - 1) == Some('S')))
-        && ((puzzle[y - 1].chars().nth(x + 1) == Some('S')
-            && puzzle[y + 1].chars().nth(x - 1) == Some('M'))
-            || (puzzle[y - 1].chars().nth(x + 1) == Some('M')
-                && puzzle[y + 1].chars().nth(x - 1) == Some('S')))
+fn check_x(i: usize, puzzle: &[u8], line_length: usize) -> bool {
+    i + line_length + 1 < puzzle.len()
+        && i > line_length + 1
+        && ((puzzle[i + line_length + 1] == b'S' && puzzle[i - line_length - 1] == b'M')
+            || (puzzle[i + line_length + 1] == b'M' && puzzle[i - line_length - 1] == b'S'))
+        && ((puzzle[i + line_length - 1] == b'S' && puzzle[i - line_length + 1] == b'M')
+            || (puzzle[i + line_length - 1] == b'M' && puzzle[i - line_length + 1] == b'S'))
 }
