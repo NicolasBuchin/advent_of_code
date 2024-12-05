@@ -1,19 +1,21 @@
+use std::collections::HashMap;
 use std::fs::{self};
 use std::time::Instant;
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
 
-    let t = 100_000;
+    let t = 1;
     let mut avg = 0;
 
     (0..t).for_each(|_| {
         let now = Instant::now();
 
-        let count = count_x(&input);
+        let count = print_queue(&input);
 
         avg += now.elapsed().as_nanos();
-        assert_eq!(count, 1831);
+        println!("count = {}", count)
+        // assert_eq!(count, 1831);
     });
 
     avg /= t;
@@ -21,24 +23,61 @@ fn main() {
     println!("avg elapsed time: {:.2?}ns", avg);
 }
 
-fn count_x(input: &str) -> usize {
-    let puzzle = input.as_bytes();
-    let line_length = input.lines().next().unwrap().len() + 1;
-
-    puzzle[line_length..puzzle.len() - line_length]
-        .iter()
-        .enumerate()
-        .filter(|(i, &c)| {
-            c == b'A'
-                && (i.rem_euclid(line_length) != 0 || i.rem_euclid(line_length) != 1)
-                && check_x(*i + line_length, puzzle, line_length)
-        })
-        .count()
+enum State {
+    Rules,
+    Evaluation,
 }
 
-fn check_x(i: usize, puzzle: &[u8], line_length: usize) -> bool {
-    i + line_length + 1 < puzzle.len()
-        && i > line_length + 1
-        && puzzle[i + line_length - 1] + puzzle[i - line_length + 1] == 160
-        && puzzle[i + line_length + 1] + puzzle[i - line_length - 1] == 160
+fn print_queue(input: &str) -> usize {
+    let mut order = HashMap::<i32, i32>::new();
+    let mut state = State::Rules;
+    let mut next_state = false;
+
+    let mut key: i32 = 0;
+    let mut target = Vec::new();
+
+    let mut count = 0;
+
+    input.bytes().for_each(|b| match state {
+        State::Rules => {
+            if b.is_ascii_digit() {
+                target.push(b);
+            } else {
+                match b {
+                    b'|' => {
+                        key = target.iter().fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
+                        target.clear();
+                    }
+                    b'\n' => {
+                        if next_state {
+                            state = State::Evaluation
+                        } else {
+                            let value = target.iter().fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
+                            order.insert(key, value);
+                            target.clear();
+                            next_state = true;
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+        State::Evaluation => {
+            if b.is_ascii_digit() {
+                target.push(b);
+            } else {
+                match b {
+                    b',' => {
+                        ();
+                    }
+                    b'\n' => {
+                        count += 1;
+                    }
+                    _ => (),
+                }
+            }
+        }
+    });
+
+    count
 }
