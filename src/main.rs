@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
 use std::fs::{self};
 use std::time::Instant;
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
 
-    let t = 1;
+    let t = 1000;
     let mut avg = 0;
 
     (0..t).for_each(|_| {
@@ -14,8 +13,7 @@ fn main() {
         let count = print_queue(&input);
 
         avg += now.elapsed().as_nanos();
-        println!("count = {}", count)
-        // assert_eq!(count, 1831);
+        assert_eq!(count, 4905);
     });
 
     avg /= t;
@@ -23,113 +21,61 @@ fn main() {
     println!("avg elapsed time: {:.2?}ns", avg);
 }
 
-enum State {
-    Rules,
-    Evaluation,
+fn print_queue(input: &str) -> i32 {
+    let bytes = &input.bytes().collect::<Vec<_>>();
+    let mut rules = [0u128; 100];
+
+    let mut i = 0;
+
+    loop {
+        let key = bytes_to_word(bytes[i + 3], bytes[i + 4]);
+        let value: u128 = 1u128 << bytes_to_word(bytes[i], bytes[i + 1]);
+
+        rules[key] |= value;
+        i += 6;
+
+        if bytes[i - 1] == b'\n' && bytes[i] == b'\n' {
+            i += 1;
+            break;
+        }
+    }
+
+    let mut passed_flag = 0u128;
+    let mut ok = true;
+    let mut count = 0;
+    let mut index = i;
+
+    while i < bytes.len() {
+        if !ok {
+            i += 3;
+            if bytes[i - 1] == b'\n' {
+                passed_flag = 0;
+                index = i;
+                ok = true;
+            }
+        } else {
+            let word = bytes_to_word(bytes[i], bytes[i + 1]);
+            let flag = rules[word];
+            if flag & passed_flag != passed_flag {
+                ok = false;
+            }
+            passed_flag |= 1u128 << word;
+            i += 3;
+
+            if bytes[i - 1] == b'\n' {
+                if ok {
+                    let p = index + (i - index).div_euclid(2);
+                    count += bytes_to_word(bytes[p - 1], bytes[p]) as i32;
+                }
+                passed_flag = 0;
+                index = i;
+                ok = true;
+            }
+        }
+    }
+    count
 }
 
-fn print_queue(input: &str) -> i32 {
-    let mut order = HashMap::<i32, HashSet<i32>>::new();
-    let mut passed = HashSet::<i32>::new();
-    let mut passed_list = Vec::new();
-
-    let mut state = State::Rules;
-    let mut next_state = false;
-
-    let mut key: i32 = 0;
-    let mut target = Vec::new();
-
-    let mut ok = true;
-
-    let mut count = 0;
-
-    input.bytes().for_each(|b| match state {
-        State::Rules => {
-            if b.is_ascii_digit() {
-                target.push(b);
-                next_state = false;
-            } else {
-                match b {
-                    b'|' => {
-                        key = target
-                            .iter()
-                            .fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
-                        target.clear();
-                    }
-                    b'\n' => {
-                        if next_state {
-                            state = State::Evaluation
-                        } else {
-                            let value = target
-                                .iter()
-                                .fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
-                            order.entry(key).or_insert_with(HashSet::new).insert(value);
-                            target.clear();
-                            next_state = true;
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-        State::Evaluation => {
-            if b.is_ascii_digit() {
-                if ok {
-                    target.push(b);
-                }
-            } else {
-                match b {
-                    b',' => {
-                        if ok {
-                            key = target
-                                .iter()
-                                .fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
-                            target.clear();
-
-                            if let Some(values) = order.get(&key) {
-                                for v in passed_list.iter() {
-                                    if values.contains(&v) {
-                                        ok = false;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            passed.insert(key);
-                            passed_list.push(key);
-                        }
-                    }
-                    b'\n' => {
-                        if ok {
-                            key = target
-                                .iter()
-                                .fold(0i32, |acc, &digit| acc * 10 + (digit - b'0') as i32);
-                            target.clear();
-
-                            if let Some(values) = order.get(&key) {
-                                for v in passed_list.iter() {
-                                    if values.contains(&v) {
-                                        ok = false;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if ok {
-                                let middle = passed_list[passed_list.len().div_ceil(2)];
-                                count += middle;
-                            }
-                        }
-
-                        passed.clear();
-                        passed_list.clear();
-                        ok = true;
-                    }
-                    _ => (),
-                }
-            }
-        }
-    });
-
-    count
+fn bytes_to_word(d: u8, u: u8) -> usize {
+    ((d - 48) * 10 + u - 48) as usize
 }
