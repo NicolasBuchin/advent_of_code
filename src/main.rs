@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{self};
 use std::time::Instant;
 
@@ -49,6 +50,12 @@ fn print_queue(input: &str) -> i32 {
         if !ok {
             i += 3;
             if bytes[i - 1] == b'\n' {
+                let mut nums = HashSet::new();
+                while index < i {
+                    nums.insert(bytes_to_word(bytes[index], bytes[index + 1]));
+                    index += 3;
+                }
+                count += find_solution(&rules, &mut nums);
                 passed_flag = 0;
                 index = i;
                 ok = true;
@@ -63,9 +70,13 @@ fn print_queue(input: &str) -> i32 {
             i += 3;
 
             if bytes[i - 1] == b'\n' {
-                if ok {
-                    let p = index + (i - index).div_euclid(2);
-                    count += bytes_to_word(bytes[p - 1], bytes[p]) as i32;
+                if !ok {
+                    let mut nums = HashSet::new();
+                    while index < i {
+                        nums.insert(bytes_to_word(bytes[index], bytes[index + 1]));
+                        index += 3;
+                    }
+                    count += find_solution(&rules, &mut nums);
                 }
                 passed_flag = 0;
                 index = i;
@@ -78,4 +89,20 @@ fn print_queue(input: &str) -> i32 {
 
 fn bytes_to_word(d: u8, u: u8) -> usize {
     ((d - 48) * 10 + u - 48) as usize
+}
+
+fn find_solution(rules: &[u128], nums: &mut HashSet<usize>) -> i32 {
+    let mut nums_flag = 0u128;
+    nums.iter().for_each(|num| nums_flag |= 1u128 << num);
+    let mut solution = Vec::new();
+    while nums.len() != 0 {
+        let best = *nums
+            .iter()
+            .max_by_key(|&num| (rules[*num] & nums_flag).count_ones())
+            .unwrap();
+        solution.push(best);
+        nums.remove(&best);
+        nums_flag &= !(1u128 << best);
+    }
+    solution[solution.len().div_euclid(2)] as i32
 }
