@@ -14,7 +14,7 @@ fn main() {
         let count = print_queue(&input);
 
         avg += now.elapsed().as_nanos();
-        assert_eq!(count, 4905);
+        assert_eq!(count, 6204);
     });
 
     avg /= t;
@@ -95,7 +95,8 @@ fn find_solution(rules: &[u128], nums: &mut HashSet<usize>) -> i32 {
     let mut nums_flag = 0u128;
     nums.iter().for_each(|num| nums_flag |= 1u128 << num);
     let mut solution = Vec::new();
-    while nums.len() != 0 {
+    let end = nums.len().div_euclid(2);
+    while nums.len() > end {
         let best = *nums
             .iter()
             .max_by_key(|&num| (rules[*num] & nums_flag).count_ones())
@@ -104,5 +105,5 @@ fn find_solution(rules: &[u128], nums: &mut HashSet<usize>) -> i32 {
         nums.remove(&best);
         nums_flag &= !(1u128 << best);
     }
-    solution[solution.len().div_euclid(2)] as i32
+    solution[solution.len() - 1] as i32
 }
