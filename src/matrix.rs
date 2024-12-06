@@ -1,7 +1,4 @@
-use std::{
-    fmt,
-    ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 #[derive(Clone)]
 pub struct Matrix<T: Clone> {
@@ -21,11 +18,7 @@ impl<T: Default + Clone> Matrix<T> {
     }
 
     pub fn make(data: Vec<T>, width: usize, height: usize) -> Self {
-        Matrix {
-            data,
-            width,
-            height,
-        }
+        Matrix { data, width, height }
     }
 
     pub fn width(&self) -> usize {
@@ -48,18 +41,5 @@ impl<T: Clone> Index<usize> for Matrix<T> {
 impl<T: Clone> IndexMut<usize> for Matrix<T> {
     fn index_mut(&mut self, row: usize) -> &mut Self::Output {
         &mut self.data[(row * self.width)..(row * self.width + self.width)]
-    }
-}
-
-impl fmt::Display for Matrix<bool> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for row in 0..self.height {
-            for col in 0..self.width {
-                let symbol = if self[row][col] { '#' } else { '.' };
-                write!(f, "{}", symbol)?;
-            }
-            writeln!(f)?; // Add a newline after each row
-        }
-        Ok(())
     }
 }
