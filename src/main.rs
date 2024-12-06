@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self};
 use std::time::Instant;
 
@@ -11,7 +11,7 @@ fn main() {
     (0..t).for_each(|_| {
         let now = Instant::now();
 
-        let count = print_queue(&input);
+        let count = guard_gallivant(&input);
 
         avg += now.elapsed().as_nanos();
         assert_eq!(count, 6204);
@@ -22,88 +22,75 @@ fn main() {
     println!("avg elapsed time: {:.2?}ns", avg);
 }
 
-fn print_queue(input: &str) -> i32 {
-    let bytes = &input.bytes().collect::<Vec<_>>();
-    let mut rules = [0u128; 100];
+fn guard_gallivant(input: &str) -> u32 {
+    let (walls_x, walls_y, mut guard_position, edge) = parse_puzzle(input);
 
-    let mut i = 0;
+    let mut steps_count = 0;
+
+    let mut direction = Direction::N;
 
     loop {
-        let key = bytes_to_word(bytes[i + 3], bytes[i + 4]);
-        let value: u128 = 1u128 << bytes_to_word(bytes[i], bytes[i + 1]);
-
-        rules[key] |= value;
-        i += 6;
-
-        if bytes[i - 1] == b'\n' && bytes[i] == b'\n' {
-            i += 1;
-            break;
-        }
-    }
-
-    let mut passed_flag = 0u128;
-    let mut ok = true;
-    let mut count = 0;
-    let mut index = i;
-
-    while i < bytes.len() {
-        if !ok {
-            i += 3;
-            if bytes[i - 1] == b'\n' {
-                let mut nums = HashSet::new();
-                while index < i {
-                    nums.insert(bytes_to_word(bytes[index], bytes[index + 1]));
-                    index += 3;
-                }
-                count += find_solution(&rules, &mut nums);
-                passed_flag = 0;
-                index = i;
-                ok = true;
-            }
-        } else {
-            let word = bytes_to_word(bytes[i], bytes[i + 1]);
-            let flag = rules[word];
-            if flag & passed_flag != passed_flag {
-                ok = false;
-            }
-            passed_flag |= 1u128 << word;
-            i += 3;
-
-            if bytes[i - 1] == b'\n' {
-                if !ok {
-                    let mut nums = HashSet::new();
-                    while index < i {
-                        nums.insert(bytes_to_word(bytes[index], bytes[index + 1]));
-                        index += 3;
+        match direction {
+            Direction::N => {
+                if let Some(v) = walls_x.get(&guard_position.x) {
+                    for &y in v.iter().rev() {
+                        if y < guard_position.y {
+                            steps_count += guard_position.y - y;
+                            direction = Direction::E;
+                            break;
+                        }
                     }
-                    count += find_solution(&rules, &mut nums);
+                } else {
+                    return steps_count;
                 }
-                passed_flag = 0;
-                index = i;
-                ok = true;
             }
+            Direction::E => todo!(),
+            Direction::S => todo!(),
+            Direction::W => todo!(),
         }
+
+        // d
     }
-    count
 }
 
-fn bytes_to_word(d: u8, u: u8) -> usize {
-    ((d - 48) * 10 + u - 48) as usize
+struct Position {
+    x: u32,
+    y: u32,
 }
 
-fn find_solution(rules: &[u128], nums: &mut HashSet<usize>) -> i32 {
-    let mut nums_flag = 0u128;
-    nums.iter().for_each(|num| nums_flag |= 1u128 << num);
-    let mut solution = Vec::new();
-    let end = nums.len().div_euclid(2);
-    while nums.len() > end {
-        let best = *nums
-            .iter()
-            .max_by_key(|&num| (rules[*num] & nums_flag).count_ones())
-            .unwrap();
-        solution.push(best);
-        nums.remove(&best);
-        nums_flag &= !(1u128 << best);
-    }
-    solution[solution.len() - 1] as i32
+enum Direction {
+    N,
+    E,
+    S,
+    W,
+}
+
+fn parse_puzzle(input: &str) -> (HashMap<u32, Vec<u32>>, HashMap<u32, Vec<u32>>, Position, Position) {
+    let mut walls_x = HashMap::new();
+    let mut walls_y = HashMap::new();
+
+    let mut x = 0;
+    let mut y = 0;
+
+    let mut guard_position = Position { x: 0, y: 0 };
+
+    input.bytes().for_each(|b| match b {
+        b'\n' => {
+            y += 1;
+            x = 0;
+        }
+        b'#' => {
+            walls_x.entry(x).or_insert_with(Vec::new).push(y);
+            walls_y.entry(y).or_insert_with(Vec::new).push(x);
+            x += 1;
+        }
+        b'^' => {
+            guard_position.x = x;
+            guard_position.y = y;
+            x += 1;
+        }
+        _ => x += 1,
+    });
+
+    (walls_x, walls_y, guard_position, Position { x, y })
 }
