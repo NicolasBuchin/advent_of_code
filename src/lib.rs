@@ -3,7 +3,7 @@ use matrix::Matrix;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashSet;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum Direction {
     N,
     E,
@@ -11,57 +11,32 @@ enum Direction {
     W,
 }
 
+#[derive(Clone, Default, PartialEq, Debug)]
+enum Path {
+    Turn(Direction),
+    Wall,
+    #[default]
+    Empty,
+}
+
 pub fn guard_gallivant(input: &str) -> usize {
     let (map, (mut x, mut y)) = parse_puzzle(input);
     let (ox, oy) = (x, y);
 
     let mut steps = HashSet::new();
-
     let mut direction = Direction::N;
 
     loop {
         steps.insert((x, y));
-        match direction {
-            Direction::N => {
-                if y == 0 {
-                    break;
-                }
-                if map[y - 1][x] {
-                    direction = Direction::E;
-                } else {
-                    y -= 1;
-                }
+        if is_edge(x, y, map.width(), map.height(), &direction) {
+            break;
+        } else {
+            let (mut next_x, mut next_y) = next_position(x, y, &direction);
+            while map[next_y][next_x] == Path::Wall {
+                direction = next_direction(&direction);
+                (next_x, next_y) = next_position(x, y, &direction);
             }
-            Direction::E => {
-                if x == map.width() - 1 {
-                    break;
-                }
-                if map[y][x + 1] {
-                    direction = Direction::S;
-                } else {
-                    x += 1;
-                }
-            }
-            Direction::S => {
-                if y == map.height() - 1 {
-                    break;
-                }
-                if map[y + 1][x] {
-                    direction = Direction::W;
-                } else {
-                    y += 1;
-                }
-            }
-            Direction::W => {
-                if x == 0 {
-                    break;
-                }
-                if map[y][x - 1] {
-                    direction = Direction::N;
-                } else {
-                    x -= 1;
-                }
-            }
+            (x, y) = (next_x, next_y);
         }
     }
 
@@ -69,116 +44,15 @@ pub fn guard_gallivant(input: &str) -> usize {
 
     steps
         .par_iter()
-        .map(|(wx, wy)| {
+        .map(|(x, y)| {
             let mut new_map = map.clone();
-            new_map[*wy][*wx] = true;
-            if is_looping(new_map, ox, oy) {
-                1
-            } else {
-                0
-            }
+            new_map[*x][*y] = Path::Wall;
+            is_looping(new_map, ox, oy)
         })
         .sum()
 }
 
-#[derive(Clone, Default, PartialEq)]
-enum Path {
-    Turn(Direction),
-    #[default]
-    Untaken,
-}
-
-fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
-    let mut steps = Matrix::<Path>::new(map.width(), map.height());
-
-    let mut direction = Direction::N;
-
-    loop {
-        match direction {
-            Direction::N => {
-                if y == 0 {
-                    return false;
-                }
-                if map[y - 1][x] {
-                    if steps[y][x] == Path::Turn(Direction::E) {
-                        return true;
-                    }
-                    match steps[y][x] {
-                        Path::Turn(Direction::E) => {
-                            return true;
-                        }
-                        Path::Untaken => {
-                            steps[y][x] = Path::Turn(Direction::E);
-                        }
-                        _ => (),
-                    }
-                    direction = Direction::E;
-                } else {
-                    y -= 1;
-                }
-            }
-            Direction::E => {
-                if x == map.width() - 1 {
-                    return false;
-                }
-                if map[y][x + 1] {
-                    match steps[y][x] {
-                        Path::Turn(Direction::S) => {
-                            return true;
-                        }
-                        Path::Untaken => {
-                            steps[y][x] = Path::Turn(Direction::S);
-                        }
-                        _ => (),
-                    }
-                    direction = Direction::S;
-                } else {
-                    x += 1;
-                }
-            }
-            Direction::S => {
-                if y == map.height() - 1 {
-                    return false;
-                }
-                if map[y + 1][x] {
-                    match steps[y][x] {
-                        Path::Turn(Direction::W) => {
-                            return true;
-                        }
-                        Path::Untaken => {
-                            steps[y][x] = Path::Turn(Direction::W);
-                        }
-                        _ => (),
-                    }
-                    direction = Direction::W;
-                } else {
-                    y += 1;
-                }
-            }
-            Direction::W => {
-                if x == 0 {
-                    return false;
-                }
-                if map[y][x - 1] {
-                    match steps[y][x] {
-                        Path::Turn(Direction::N) => {
-                            return true;
-                        }
-                        Path::Untaken => {
-                            steps[y][x] = Path::Turn(Direction::N);
-                        }
-                        _ => (),
-                    }
-                    direction = Direction::N;
-                } else {
-                    x -= 1;
-                }
-            }
-        }
-    }
-}
-
-fn parse_puzzle(input: &str) -> (Matrix<bool>, (usize, usize)) {
+fn parse_puzzle(input: &str) -> (Matrix<Path>, (usize, usize)) {
     let mut map = Vec::with_capacity(130 * 130);
 
     let mut width = 0;
@@ -189,16 +63,12 @@ fn parse_puzzle(input: &str) -> (Matrix<bool>, (usize, usize)) {
     input.bytes().for_each(|b| {
         match b {
             b'\n' => width_found = true,
-            b'#' => map.push(true),
+            b'#' => map.push(Path::Wall),
             b'^' => {
-                if width_found {
-                    guard_position = (map.len().rem_euclid(width), map.len().div_euclid(width));
-                } else {
-                    guard_position = (0, map.len());
-                }
-                map.push(false)
+                guard_position = (map.len().rem_euclid(width), map.len().div_euclid(width));
+                map.push(Path::Empty)
             }
-            _ => map.push(false),
+            _ => map.push(Path::Empty),
         }
         if !width_found {
             width += 1;
@@ -208,4 +78,53 @@ fn parse_puzzle(input: &str) -> (Matrix<bool>, (usize, usize)) {
     let map = Matrix::make(map.clone(), width, map.len().div_euclid(width));
 
     (map, guard_position)
+}
+
+fn next_direction(d: &Direction) -> Direction {
+    match d {
+        Direction::N => Direction::E,
+        Direction::E => Direction::S,
+        Direction::S => Direction::W,
+        Direction::W => Direction::N,
+    }
+}
+
+fn next_position(x: usize, y: usize, d: &Direction) -> (usize, usize) {
+    match d {
+        Direction::N => (x, y - 1),
+        Direction::E => (x + 1, y),
+        Direction::S => (x, y + 1),
+        Direction::W => (x - 1, y),
+    }
+}
+
+fn is_edge(x: usize, y: usize, width: usize, height: usize, d: &Direction) -> bool {
+    match d {
+        Direction::N => y == 0,
+        Direction::E => x == width - 1,
+        Direction::S => y == height - 1,
+        Direction::W => x == 0,
+    }
+}
+
+fn is_looping(mut map: Matrix<Path>, mut x: usize, mut y: usize) -> usize {
+    let mut direction = Direction::N;
+    loop {
+        if is_edge(x, y, map.width(), map.height(), &direction) {
+            return 0;
+        } else {
+            let (mut next_x, mut next_y) = next_position(x, y, &direction);
+            while map[next_y][next_x] == Path::Wall {
+                direction = next_direction(&direction);
+                if map[y][x] == Path::Turn(direction) {
+                    return 1;
+                }
+                if map[y][x] == Path::Empty {
+                    map[y][x] = Path::Turn(direction);
+                }
+                (next_x, next_y) = next_position(x, y, &direction);
+            }
+            (x, y) = (next_x, next_y);
+        }
+    }
 }
