@@ -1,6 +1,9 @@
-use std::collections::{HashMap, HashSet};
 use std::fs::{self};
 use std::time::Instant;
+
+use matrix::Matrix;
+
+mod matrix;
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
@@ -14,7 +17,7 @@ fn main() {
         let count = guard_gallivant(&input);
 
         avg += now.elapsed().as_nanos();
-        assert_eq!(count, 6204);
+        assert_eq!(count, 4580);
     });
 
     avg /= t;
@@ -22,40 +25,67 @@ fn main() {
     println!("avg elapsed time: {:.2?}ns", avg);
 }
 
-fn guard_gallivant(input: &str) -> u32 {
-    let (walls_x, walls_y, mut guard_position, edge) = parse_puzzle(input);
+fn guard_gallivant(input: &str) -> usize {
+    let (map, (mut x, mut y)) = parse_puzzle(input);
 
-    let mut steps_count = 0;
+    let mut steps = Matrix::new(map.width(), map.height());
 
     let mut direction = Direction::N;
 
     loop {
         match direction {
             Direction::N => {
-                if let Some(v) = walls_x.get(&guard_position.x) {
-                    for &y in v.iter().rev() {
-                        if y < guard_position.y {
-                            steps_count += guard_position.y - y;
-                            direction = Direction::E;
-                            break;
-                        }
-                    }
+                steps[y][x] = true;
+                if y == 0 {
+                    break;
+                }
+                if map[y - 1][x] {
+                    direction = Direction::E;
                 } else {
-                    return steps_count;
+                    y -= 1;
                 }
             }
-            Direction::E => todo!(),
-            Direction::S => todo!(),
-            Direction::W => todo!(),
+            Direction::E => {
+                steps[y][x] = true;
+                if x == map.width() - 1 {
+                    break;
+                }
+                if map[y][x + 1] {
+                    direction = Direction::S;
+                } else {
+                    x += 1;
+                }
+            }
+            Direction::S => {
+                steps[y][x] = true;
+                if y == map.height() - 1 {
+                    break;
+                }
+                if map[y + 1][x] {
+                    direction = Direction::W;
+                } else {
+                    y += 1;
+                }
+            }
+            Direction::W => {
+                steps[y][x] = true;
+                if x == 0 {
+                    break;
+                }
+                if map[y][x - 1] {
+                    direction = Direction::N;
+                } else {
+                    x -= 1;
+                }
+            }
         }
-
-        // d
     }
+
+    count_steps(&steps.data)
 }
 
-struct Position {
-    x: u32,
-    y: u32,
+fn count_steps(steps: &[bool]) -> usize {
+    steps.iter().filter(|&b| *b).count()
 }
 
 enum Direction {
@@ -65,32 +95,34 @@ enum Direction {
     W,
 }
 
-fn parse_puzzle(input: &str) -> (HashMap<u32, Vec<u32>>, HashMap<u32, Vec<u32>>, Position, Position) {
-    let mut walls_x = HashMap::new();
-    let mut walls_y = HashMap::new();
+fn parse_puzzle(input: &str) -> (Matrix<bool>, (usize, usize)) {
+    let mut map = Vec::with_capacity(130 * 130);
 
-    let mut x = 0;
-    let mut y = 0;
+    let mut width = 0;
+    let mut width_found = false;
 
-    let mut guard_position = Position { x: 0, y: 0 };
+    let mut guard_position = (0, 0);
 
-    input.bytes().for_each(|b| match b {
-        b'\n' => {
-            y += 1;
-            x = 0;
+    input.bytes().for_each(|b| {
+        match b {
+            b'\n' => width_found = true,
+            b'#' => map.push(true),
+            b'^' => {
+                if width_found {
+                    guard_position = (map.len().rem_euclid(width), map.len().div_euclid(width));
+                } else {
+                    guard_position = (0, map.len());
+                }
+                map.push(false)
+            }
+            _ => map.push(false),
         }
-        b'#' => {
-            walls_x.entry(x).or_insert_with(Vec::new).push(y);
-            walls_y.entry(y).or_insert_with(Vec::new).push(x);
-            x += 1;
+        if !width_found {
+            width += 1;
         }
-        b'^' => {
-            guard_position.x = x;
-            guard_position.y = y;
-            x += 1;
-        }
-        _ => x += 1,
     });
 
-    (walls_x, walls_y, guard_position, Position { x, y })
+    let map = Matrix::make(map.clone(), width, map.len().div_euclid(width));
+
+    (map, guard_position)
 }
