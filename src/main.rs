@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::fs::{self};
 use std::time::Instant;
 
 use matrix::Matrix;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 mod matrix;
 
@@ -17,7 +19,7 @@ fn main() {
         let count = guard_gallivant(&input);
 
         avg += now.elapsed().as_nanos();
-        assert_eq!(count, 4580);
+        assert_eq!(count, 1480);
     });
 
     avg /= t;
@@ -25,17 +27,26 @@ fn main() {
     println!("avg elapsed time: {:.2?}ns", avg);
 }
 
+#[derive(Clone, PartialEq)]
+enum Direction {
+    N,
+    E,
+    S,
+    W,
+}
+
 fn guard_gallivant(input: &str) -> usize {
     let (map, (mut x, mut y)) = parse_puzzle(input);
+    let (ox, oy) = (x, y);
 
-    let mut steps = Matrix::new(map.width(), map.height());
+    let mut steps = HashSet::new();
 
     let mut direction = Direction::N;
 
     loop {
+        steps.insert((x, y));
         match direction {
             Direction::N => {
-                steps[y][x] = true;
                 if y == 0 {
                     break;
                 }
@@ -46,7 +57,6 @@ fn guard_gallivant(input: &str) -> usize {
                 }
             }
             Direction::E => {
-                steps[y][x] = true;
                 if x == map.width() - 1 {
                     break;
                 }
@@ -57,7 +67,6 @@ fn guard_gallivant(input: &str) -> usize {
                 }
             }
             Direction::S => {
-                steps[y][x] = true;
                 if y == map.height() - 1 {
                     break;
                 }
@@ -68,7 +77,6 @@ fn guard_gallivant(input: &str) -> usize {
                 }
             }
             Direction::W => {
-                steps[y][x] = true;
                 if x == 0 {
                     break;
                 }
@@ -81,18 +89,121 @@ fn guard_gallivant(input: &str) -> usize {
         }
     }
 
-    count_steps(&steps.data)
+    steps.remove(&(ox, oy));
+
+    steps
+        .par_iter()
+        .map(|(wx, wy)| {
+            let mut new_map = map.clone();
+            new_map[*wy][*wx] = true;
+            if is_looping(new_map, ox, oy) {
+                1
+            } else {
+                0
+            }
+        })
+        .sum()
 }
 
-fn count_steps(steps: &[bool]) -> usize {
-    steps.iter().filter(|&b| *b).count()
+#[derive(Clone, Default, PartialEq)]
+enum Path {
+    Turn(Direction),
+    Continue,
+    #[default]
+    Untaken,
 }
 
-enum Direction {
-    N,
-    E,
-    S,
-    W,
+fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
+    let mut steps = Matrix::<Path>::new(map.width(), map.height());
+
+    let mut direction = Direction::N;
+
+    loop {
+        if steps[y][x] == Path::Untaken {
+            steps[y][x] = Path::Continue;
+        };
+        match direction {
+            Direction::N => {
+                if y == 0 {
+                    return false;
+                }
+                if map[y - 1][x] {
+                    if steps[y][x] == Path::Turn(Direction::E) {
+                        return true;
+                    }
+                    match steps[y][x] {
+                        Path::Turn(Direction::E) => {
+                            return true;
+                        }
+                        Path::Continue | Path::Untaken => {
+                            steps[y][x] = Path::Turn(Direction::E);
+                        }
+                        _ => (),
+                    }
+                    direction = Direction::E;
+                } else {
+                    y -= 1;
+                }
+            }
+            Direction::E => {
+                if x == map.width() - 1 {
+                    return false;
+                }
+                if map[y][x + 1] {
+                    match steps[y][x] {
+                        Path::Turn(Direction::S) => {
+                            return true;
+                        }
+                        Path::Continue | Path::Untaken => {
+                            steps[y][x] = Path::Turn(Direction::S);
+                        }
+                        _ => (),
+                    }
+                    direction = Direction::S;
+                } else {
+                    x += 1;
+                }
+            }
+            Direction::S => {
+                if y == map.height() - 1 {
+                    return false;
+                }
+                if map[y + 1][x] {
+                    match steps[y][x] {
+                        Path::Turn(Direction::W) => {
+                            return true;
+                        }
+                        Path::Continue | Path::Untaken => {
+                            steps[y][x] = Path::Turn(Direction::W);
+                        }
+                        _ => (),
+                    }
+                    direction = Direction::W;
+                } else {
+                    y += 1;
+                }
+            }
+            Direction::W => {
+                if x == 0 {
+                    return false;
+                }
+                if map[y][x - 1] {
+                    match steps[y][x] {
+                        Path::Turn(Direction::N) => {
+                            return true;
+                        }
+                        Path::Continue | Path::Untaken => {
+                            steps[y][x] = Path::Turn(Direction::N);
+                        }
+                        _ => (),
+                    }
+                    direction = Direction::N;
+                } else {
+                    x -= 1;
+                }
+            }
+        }
+    }
 }
 
 fn parse_puzzle(input: &str) -> (Matrix<bool>, (usize, usize)) {

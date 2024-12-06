@@ -3,7 +3,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-pub struct Matrix<T> {
+#[derive(Clone)]
+pub struct Matrix<T: Clone> {
     pub data: Vec<T>,
     width: usize,
     height: usize,
@@ -36,7 +37,7 @@ impl<T: Default + Clone> Matrix<T> {
     }
 }
 
-impl<T> Index<usize> for Matrix<T> {
+impl<T: Clone> Index<usize> for Matrix<T> {
     type Output = [T];
 
     fn index(&self, row: usize) -> &Self::Output {
@@ -44,7 +45,7 @@ impl<T> Index<usize> for Matrix<T> {
     }
 }
 
-impl<T> IndexMut<usize> for Matrix<T> {
+impl<T: Clone> IndexMut<usize> for Matrix<T> {
     fn index_mut(&mut self, row: usize) -> &mut Self::Output {
         &mut self.data[(row * self.width)..(row * self.width + self.width)]
     }
