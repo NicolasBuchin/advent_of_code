@@ -3,7 +3,7 @@ use matrix::Matrix;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashSet;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
 enum Direction {
     N,
     E,
@@ -11,7 +11,7 @@ enum Direction {
     W,
 }
 
-#[derive(Clone, Default, PartialEq, Debug)]
+#[derive(Clone, Default, PartialEq, Debug, Eq, Hash)]
 enum Path {
     Turn(Direction),
     Wall,
@@ -40,13 +40,11 @@ pub fn guard_gallivant(input: &str) -> usize {
         }
     }
 
-    steps.remove(&(ox, oy));
-
     steps
         .par_iter()
         .map(|(x, y)| {
             let mut new_map = map.clone();
-            new_map[*x][*y] = Path::Wall;
+            new_map[*y][*x] = Path::Wall;
             is_looping(new_map, ox, oy)
         })
         .sum()
@@ -68,14 +66,16 @@ fn parse_puzzle(input: &str) -> (Matrix<Path>, (usize, usize)) {
                 guard_position = (map.len().rem_euclid(width), map.len().div_euclid(width));
                 map.push(Path::Empty)
             }
-            _ => map.push(Path::Empty),
+            b'.' => map.push(Path::Empty),
+            _ => (),
         }
-        if !width_found {
+        if !width_found && b != b'\r' {
             width += 1;
         }
     });
 
-    let map = Matrix::make(map.clone(), width, map.len().div_euclid(width));
+    let map = Matrix::make(&map, width, map.len().div_euclid(width));
+    //println!("{:?}", map);
 
     (map, guard_position)
 }
