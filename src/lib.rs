@@ -84,7 +84,6 @@ pub fn guard_gallivant(input: &str) -> usize {
 #[derive(Clone, Default, PartialEq)]
 enum Path {
     Turn(Direction),
-    Continue,
     #[default]
     Untaken,
 }
@@ -95,9 +94,6 @@ fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
     let mut direction = Direction::N;
 
     loop {
-        if steps[y][x] == Path::Untaken {
-            steps[y][x] = Path::Continue;
-        };
         match direction {
             Direction::N => {
                 if y == 0 {
@@ -111,7 +107,7 @@ fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
                         Path::Turn(Direction::E) => {
                             return true;
                         }
-                        Path::Continue | Path::Untaken => {
+                        Path::Untaken => {
                             steps[y][x] = Path::Turn(Direction::E);
                         }
                         _ => (),
@@ -130,7 +126,7 @@ fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
                         Path::Turn(Direction::S) => {
                             return true;
                         }
-                        Path::Continue | Path::Untaken => {
+                        Path::Untaken => {
                             steps[y][x] = Path::Turn(Direction::S);
                         }
                         _ => (),
@@ -149,7 +145,7 @@ fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
                         Path::Turn(Direction::W) => {
                             return true;
                         }
-                        Path::Continue | Path::Untaken => {
+                        Path::Untaken => {
                             steps[y][x] = Path::Turn(Direction::W);
                         }
                         _ => (),
@@ -168,7 +164,7 @@ fn is_looping(map: Matrix<bool>, mut x: usize, mut y: usize) -> bool {
                         Path::Turn(Direction::N) => {
                             return true;
                         }
-                        Path::Continue | Path::Untaken => {
+                        Path::Untaken => {
                             steps[y][x] = Path::Turn(Direction::N);
                         }
                         _ => (),
