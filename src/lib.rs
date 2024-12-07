@@ -63,8 +63,6 @@ pub fn bridge_repair_par(input: &str) -> usize {
             let mut digits_mul = 1;
             let mut target = 0;
 
-            let mut solution_count = 0;
-
             l.bytes().for_each(|b| {
                 if b.is_ascii_digit() {
                     digits = digits * 10 + b as usize - 0x30;
@@ -95,11 +93,10 @@ pub fn bridge_repair_par(input: &str) -> usize {
             });
             for &n in &test_numbers[0..test_numbers_len] {
                 if n + digits == target || n * digits == target || n * digits_mul + digits == target {
-                    solution_count += target;
-                    break;
+                    return target;
                 }
             }
-            solution_count
+            0
         })
         .sum()
 }
