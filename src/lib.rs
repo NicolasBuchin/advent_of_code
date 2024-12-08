@@ -1,62 +1,41 @@
-use rayon::{iter::ParallelIterator, str::ParallelString};
+use std::collections::{HashMap, HashSet};
 
-pub fn bridge_repair_par(input: &str) -> usize {
-    input
-        .par_lines()
-        .map(|l| {
-            let bytes = l.as_bytes();
-            let mut i = 0;
+pub fn resonant_collinearity(input: &str) -> usize {
+    let mut map: HashMap<u8, Vec<(i32, i32)>> = HashMap::new();
+    let mut antinodes = HashSet::new();
+    let (mut x, mut y) = (0, 0);
+    let mut width = 0;
 
-            let target = {
-                let mut t = 0;
-                while bytes[i] != b':' {
-                    t = 10 * t + bytes[i] as usize - 0x30;
-                    i += 1;
-                }
-                t
-            };
-
-            i += 2;
-
-            let (test_numbers, test_numbers_mul, test_numbers_len) = {
-                let mut test_numbers = [0usize; 12];
-                let mut test_numbers_mul = [0usize; 12];
-                let mut test_numbers_len = 0;
-                bytes[i..]
-                    .split(|&b| b == b' ')
-                    .map(|chunk| {
-                        chunk
-                            .iter()
-                            .fold((0, 1), |(d, dm), &b| (d * 10 + (b as usize - 0x30), dm * 10))
-                    })
-                    .enumerate()
-                    .for_each(|(idx, (digits, digits_mul))| {
-                        test_numbers[idx] = digits;
-                        test_numbers_mul[idx] = digits_mul;
-                        test_numbers_len += 1;
-                    });
-                (test_numbers, test_numbers_mul, test_numbers_len)
-            };
-
-            if find_solution(&test_numbers, &test_numbers_mul, target, test_numbers_len) {
-                return target;
+    for b in input.bytes() {
+        if b == b'\r' {
+            continue;
+        } else if b == b'.' {
+            x += 1;
+        } else if b == b'\n' {
+            y += 1;
+            width = x;
+            x = 0;
+        } else {
+            if let Some(positions) = map.get(&b) {
+                positions.iter().for_each(|(i, j)| {
+                    let (dx, dy) = (i - x, j - y);
+                    antinodes.insert((x - dx, y - dy));
+                    antinodes.insert((i + dx, j + dy));
+                });
             }
-            0
+            map.entry(b).or_default().push((x, y));
+            x += 1;
+        }
+    }
+
+    antinodes
+        .iter()
+        .map(|(i, j)| {
+            if *i >= 0 && *j >= 0 && *i < width && *j < y {
+                1
+            } else {
+                0
+            }
         })
         .sum()
-}
-
-fn find_solution(test_numbers: &[usize], test_numbers_mul: &[usize], target: usize, i: usize) -> bool {
-    if target == 0 {
-        return true;
-    }
-    if i == 0 {
-        return false;
-    }
-    let digits = test_numbers[i - 1];
-    let digits_mul = test_numbers_mul[i - 1];
-    (target.rem_euclid(digits) == 0 && find_solution(test_numbers, test_numbers_mul, target.div_euclid(digits), i - 1))
-        || (target.rem_euclid(digits_mul) == digits
-            && find_solution(test_numbers, test_numbers_mul, target.div_euclid(digits_mul), i - 1))
-        || (target >= digits && find_solution(test_numbers, test_numbers_mul, target - digits, i - 1))
 }

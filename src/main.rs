@@ -1,9 +1,9 @@
-use advent_of_code::bridge_repair_par;
+use advent_of_code::resonant_collinearity;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
-    let solution = bridge_repair_par(&input);
-    assert_eq!(solution, 254136560217241);
+    let solution = resonant_collinearity(&input);
+    assert_eq!(solution, 369);
     println!("count: {}", solution);
 }
