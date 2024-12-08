@@ -4,6 +4,7 @@ use std::fs;
 
 fn benchmark_resonant_collinearity(c: &mut Criterion) {
     let input = fs::read_to_string("input.txt").unwrap();
+    let input = input.replace('\r', "");
     c.bench_function("resonant_collinearity", |b| {
         b.iter(|| resonant_collinearity(black_box(&input)))
     });
