@@ -1,40 +1,60 @@
 pub fn disk_fragmenter(input: &str) -> usize {
-    let mut input_clone = input.to_owned();
-    let bytes: &mut [u8] = unsafe { input_clone.as_bytes_mut() };
-    let mut checksum = 0;
-    let mut idx = bytes[0] as usize - 0x30;
+    let mut memory: Vec<(usize, u8, usize)> = Vec::new();
+    let mut open: Vec<(usize, u8)> = Vec::new();
 
-    let mut i = 1;
+    let mut biggest_open_size = 0;
 
-    let mut j = input.len() - 1;
-    let mut v = j >> 1;
+    {
+        let mut idx = 0;
+        let bytes = input.as_bytes();
+        let mut i = 0;
 
-    loop {
-        if i > j {
-            break;
-        }
-        if bytes[i] - 0x30 == 0 {
-            i += 1;
-            let v = i >> 1;
-            for _ in 0..bytes[i] - 0x30 {
-                checksum += idx * v;
-                idx += 1;
+        loop {
+            memory.push((idx, bytes[i] - 0x30, i >> 1));
+            idx += bytes[i] as usize - 0x30;
+
+            if i == input.len() - 1 {
+                break;
             }
 
-            i += 1;
-            continue;
-        }
-        if bytes[j] - 0x30 == 0 {
-            j -= 2;
-            v = j >> 1;
-            continue;
-        }
+            let open_size = bytes[i + 1] - 0x30;
+            open.push((idx, open_size));
+            idx += bytes[i + 1] as usize - 0x30;
 
-        checksum += idx * v;
-        idx += 1;
-        bytes[i] -= 1;
-        bytes[j] -= 1;
+            if open_size > biggest_open_size {
+                biggest_open_size = open_size;
+            }
+
+            i += 2;
+        }
     }
 
-    checksum
+    let mut sum = 0;
+
+    for i in (0..memory.len()).rev() {
+        let (mut memory_position, memory_size, v) = memory[i];
+        if memory_size > biggest_open_size {
+            continue;
+        }
+        for j in 0..open.len() {
+            let (mut open_position, mut open_size) = open[j];
+            if open_position > memory_position {
+                break;
+            }
+            if open_size >= memory_size {
+                memory_position = open_position;
+                open_size -= memory_size;
+                open_position += memory_size as usize;
+                open[j] = (open_position, open_size);
+                break;
+            }
+        }
+        memory[i] = (memory_position, memory_size, v);
+        let size = memory_size as usize;
+        let value = v as usize;
+        let sum_of_indices = size * memory_position + ((size * (size - 1)) >> 1);
+        sum += sum_of_indices * value;
+    }
+
+    sum
 }
