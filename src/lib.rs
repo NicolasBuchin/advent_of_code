@@ -28,7 +28,7 @@ pub fn hoof_it(input: &str) -> usize {
 
     zeroes[0..zeroes_len]
         .par_iter()
-        .map(|i| find_score(*i, line_size, bytes.len(), bytes))
+        .map(|i| find_raiting(*i, b'0', line_size, bytes.len(), bytes))
         .sum()
 }
 
@@ -60,4 +60,31 @@ fn find_score(i: usize, line_size: usize, max_length: usize, bytes: &[u8]) -> us
     }
 
     lookup.len()
+}
+
+fn find_raiting(i: usize, score: u8, line_size: usize, max_length: usize, bytes: &[u8]) -> usize {
+    if bytes[i] != score {
+        return 0;
+    }
+    if score == b'9' {
+        return 1;
+    }
+
+    let mut raiting = 0;
+
+    if i > line_size {
+        raiting += find_raiting(i - line_size, score + 1, line_size, max_length, bytes);
+    }
+    if i < max_length - line_size {
+        raiting += find_raiting(i + line_size, score + 1, line_size, max_length, bytes);
+    }
+    let rem = i.rem_euclid(line_size);
+    if rem > 0 {
+        raiting += find_raiting(i - 1, score + 1, line_size, max_length, bytes);
+    }
+    if rem < line_size - 1 {
+        raiting += find_raiting(i + 1, score + 1, line_size, max_length, bytes);
+    }
+
+    raiting
 }
