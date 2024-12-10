@@ -1,60 +1,63 @@
-pub fn disk_fragmenter(input: &str) -> usize {
-    let mut memory: Vec<(usize, u8, usize)> = Vec::new();
-    let mut open: Vec<(usize, u8)> = Vec::new();
+use std::collections::HashSet;
 
-    let mut biggest_open_size = 0;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-    {
-        let mut idx = 0;
-        let bytes = input.as_bytes();
-        let mut i = 0;
+pub fn hoof_it(input: &str) -> usize {
+    let bytes = input.as_bytes();
 
-        loop {
-            memory.push((idx, bytes[i] - 0x30, i >> 1));
-            idx += bytes[i] as usize - 0x30;
-
-            if i == input.len() - 1 {
+    let line_size = {
+        let mut line_size = 0;
+        for i in 0..bytes.len() {
+            if bytes[i] == b'\n' {
+                line_size = i + 1;
                 break;
             }
-
-            let open_size = bytes[i + 1] - 0x30;
-            open.push((idx, open_size));
-            idx += bytes[i + 1] as usize - 0x30;
-
-            if open_size > biggest_open_size {
-                biggest_open_size = open_size;
-            }
-
-            i += 2;
         }
+        line_size
+    };
+
+    let mut zeroes = [0usize; 200];
+    let mut zeroes_len = 0;
+
+    bytes.iter().enumerate().for_each(|(i, &b)| {
+        if b == b'0' {
+            zeroes[zeroes_len] = i;
+            zeroes_len += 1;
+        }
+    });
+
+    zeroes[0..zeroes_len]
+        .par_iter()
+        .map(|i| find_score(*i, line_size, bytes.len(), bytes))
+        .sum()
+}
+
+fn find_score(i: usize, line_size: usize, max_length: usize, bytes: &[u8]) -> usize {
+    let mut lookup = HashSet::new();
+    lookup.insert(i);
+
+    let mut score = b'0';
+
+    while score != b'9' {
+        score += 1;
+        let mut new_lookup = HashSet::new();
+        for i in lookup.iter() {
+            if *i > line_size && bytes[*i - line_size] == score {
+                new_lookup.insert(*i - line_size);
+            }
+            if *i < max_length - line_size && bytes[*i + line_size] == score {
+                new_lookup.insert(*i + line_size);
+            }
+            let rem = i.rem_euclid(line_size);
+            if rem > 0 && bytes[*i - 1] == score {
+                new_lookup.insert(*i - 1);
+            }
+            if rem < line_size - 1 && bytes[*i + 1] == score {
+                new_lookup.insert(*i + 1);
+            }
+        }
+        lookup = new_lookup;
     }
 
-    let mut sum = 0;
-
-    for i in (0..memory.len()).rev() {
-        let (mut memory_position, memory_size, v) = memory[i];
-        if memory_size > biggest_open_size {
-            continue;
-        }
-        for j in 0..open.len() {
-            let (mut open_position, mut open_size) = open[j];
-            if open_position > memory_position {
-                break;
-            }
-            if open_size >= memory_size {
-                memory_position = open_position;
-                open_size -= memory_size;
-                open_position += memory_size as usize;
-                open[j] = (open_position, open_size);
-                break;
-            }
-        }
-        memory[i] = (memory_position, memory_size, v);
-        let size = memory_size as usize;
-        let value = v as usize;
-        let sum_of_indices = size * memory_position + ((size * (size - 1)) >> 1);
-        sum += sum_of_indices * value;
-    }
-
-    sum
+    lookup.len()
 }

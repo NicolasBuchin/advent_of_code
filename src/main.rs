@@ -1,10 +1,10 @@
-use advent_of_code::disk_fragmenter;
+use advent_of_code::hoof_it;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    let solution = disk_fragmenter(&input);
-    assert_eq!(solution, 6423258376982);
+    let solution = hoof_it(&input);
+    assert_eq!(solution, 468);
     println!("count: {}", solution);
 }
