@@ -3,70 +3,64 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 const SEARCH_DEPTH: usize = 75;
 
 pub fn plutonian_pebbles(input: &str) -> usize {
-    let bytes = input.as_bytes();
     let mut search_map = [[0usize; SEARCH_DEPTH + 1]; 10];
-
     search_map[0][0] = 1;
     search_map[0][1] = 1;
     search_map[0][2] = 1;
     search_map[0][3] = 2;
     search_map[0][4] = 4;
-    for x in 1..5 {
-        search_map[x][0] = 1;
-        search_map[x][1] = 1;
-        search_map[x][2] = 2;
-        search_map[x][3] = 4;
-        search_map[x][4] = 4;
-    }
-    for x in 5..10 {
-        search_map[x][0] = 1;
-        search_map[x][1] = 1;
-        search_map[x][2] = 1;
-        search_map[x][3] = 2;
-        search_map[x][4] = 4;
-    }
-
-    for x in 5..=SEARCH_DEPTH {
-        search_map[0][x] = 2 * search_map[2][x - 4] + search_map[0][x - 4] + search_map[4][x - 4];
-        search_map[1][x] = 2 * search_map[2][x - 3] + search_map[0][x - 3] + search_map[4][x - 3];
-        search_map[2][x] = 2 * search_map[4][x - 3] + search_map[0][x - 3] + search_map[8][x - 3];
-        search_map[3][x] = search_map[6][x - 3]
-            + search_map[0][x - 3]
-            + search_map[7][x - 3]
-            + search_map[2][x - 3];
-        search_map[4][x] = search_map[8][x - 3]
-            + search_map[0][x - 3]
-            + search_map[9][x - 3]
-            + search_map[6][x - 3];
-        search_map[5][x] = 2 * search_map[0][x - 5]
-            + 2 * search_map[2][x - 5]
-            + search_map[4][x - 5]
-            + 3 * search_map[8][x - 5];
-        search_map[6][x] = search_map[2][x - 5]
-            + 2 * search_map[4][x - 5]
-            + 2 * search_map[5][x - 5]
-            + search_map[6][x - 5]
-            + search_map[7][x - 5]
-            + search_map[9][x - 5];
-        search_map[7][x] = search_map[0][x - 5]
-            + 2 * search_map[2][x - 5]
-            + search_map[3][x - 5]
-            + 2 * search_map[6][x - 5]
-            + search_map[7][x - 5]
-            + search_map[8][x - 5];
-        search_map[8][x] = 2 * search_map[2][x - 5]
-            + search_map[3][x - 5]
-            + search_map[6][x - 5]
-            + 2 * search_map[7][x - 5]
-            + search_map[8][x - 4];
-        search_map[9][x] = search_map[1][x - 5]
-            + search_map[3][x - 5]
-            + search_map[4][x - 5]
-            + 2 * search_map[6][x - 5]
-            + 2 * search_map[8][x - 5]
-            + search_map[9][x - 5];
+    search_map.iter_mut().take(5).skip(1).for_each(|sum| {
+        sum[0] = 1;
+        sum[1] = 1;
+        sum[2] = 2;
+        sum[3] = 4;
+        sum[4] = 4;
+    });
+    search_map.iter_mut().skip(5).for_each(|sum| {
+        sum[0] = 1;
+        sum[1] = 1;
+        sum[2] = 1;
+        sum[3] = 2;
+        sum[4] = 4;
+    });
+    for depth in 5..=SEARCH_DEPTH {
+        search_map[0][depth] = 2 * search_map[2][depth - 4] + search_map[0][depth - 4] + search_map[4][depth - 4];
+        search_map[1][depth] = 2 * search_map[2][depth - 3] + search_map[0][depth - 3] + search_map[4][depth - 3];
+        search_map[2][depth] = 2 * search_map[4][depth - 3] + search_map[0][depth - 3] + search_map[8][depth - 3];
+        search_map[3][depth] =
+            search_map[6][depth - 3] + search_map[0][depth - 3] + search_map[7][depth - 3] + search_map[2][depth - 3];
+        search_map[4][depth] =
+            search_map[8][depth - 3] + search_map[0][depth - 3] + search_map[9][depth - 3] + search_map[6][depth - 3];
+        search_map[5][depth] = 2 * search_map[0][depth - 5]
+            + 2 * search_map[2][depth - 5]
+            + search_map[4][depth - 5]
+            + 3 * search_map[8][depth - 5];
+        search_map[6][depth] = search_map[2][depth - 5]
+            + 2 * search_map[4][depth - 5]
+            + 2 * search_map[5][depth - 5]
+            + search_map[6][depth - 5]
+            + search_map[7][depth - 5]
+            + search_map[9][depth - 5];
+        search_map[7][depth] = search_map[0][depth - 5]
+            + 2 * search_map[2][depth - 5]
+            + search_map[3][depth - 5]
+            + 2 * search_map[6][depth - 5]
+            + search_map[7][depth - 5]
+            + search_map[8][depth - 5];
+        search_map[8][depth] = 2 * search_map[2][depth - 5]
+            + search_map[3][depth - 5]
+            + search_map[6][depth - 5]
+            + 2 * search_map[7][depth - 5]
+            + search_map[8][depth - 4];
+        search_map[9][depth] = search_map[1][depth - 5]
+            + search_map[3][depth - 5]
+            + search_map[4][depth - 5]
+            + 2 * search_map[6][depth - 5]
+            + 2 * search_map[8][depth - 5]
+            + search_map[9][depth - 5];
     }
 
+    let bytes = input.as_bytes();
     let mut stones = [0usize; 10];
     let mut stones_len = 0;
 
@@ -90,11 +84,7 @@ pub fn plutonian_pebbles(input: &str) -> usize {
         .sum()
 }
 
-fn transform_count_search(
-    value: usize,
-    mut depth: usize,
-    search_map: &[[usize; SEARCH_DEPTH + 1]; 10],
-) -> usize {
+fn transform_count_search(value: usize, mut depth: usize, search_map: &[[usize; SEARCH_DEPTH + 1]; 10]) -> usize {
     if depth == 0 {
         return 1;
     }
@@ -112,7 +102,7 @@ fn transform_count_search(
     let length = value.checked_ilog10().unwrap_or(0) + 1;
     if length.rem_euclid(2) == 0 {
         let middle = 10usize.pow(length.div_euclid(2));
-        if SEARCH_DEPTH - depth < 15 {
+        if SEARCH_DEPTH - depth < SEARCH_DEPTH.div_ceil(2) {
             let values = [value.div_euclid(middle), value.rem_euclid(middle)];
             values
                 .par_iter()
@@ -121,10 +111,9 @@ fn transform_count_search(
         } else {
             let left = value.div_euclid(middle);
             let right = value.rem_euclid(middle);
-            return transform_count_search(left, depth, search_map)
-                + transform_count_search(right, depth, search_map);
+            transform_count_search(left, depth, search_map) + transform_count_search(right, depth, search_map)
         }
     } else {
-        return transform_count_search(value * 2024, depth, search_map);
+        transform_count_search(value * 2024, depth, search_map)
     }
 }
