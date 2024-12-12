@@ -1,14 +1,12 @@
-use advent_of_code::plutonian_pebbles;
+use advent_of_code::garden_groups;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
 
-fn benchmark_plutonian_pebbles(c: &mut Criterion) {
+fn benchmark_garden_groups(c: &mut Criterion) {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    c.bench_function("plutonian_pebbles", |b| {
-        b.iter(|| plutonian_pebbles(black_box(&input)))
-    });
+    c.bench_function("garden_groups", |b| b.iter(|| garden_groups(black_box(&input))));
 }
 
-criterion_group!(benches, benchmark_plutonian_pebbles);
+criterion_group!(benches, benchmark_garden_groups);
 criterion_main!(benches);

@@ -1,119 +1,41 @@
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-
-const SEARCH_DEPTH: usize = 75;
-
-pub fn plutonian_pebbles(input: &str) -> usize {
-    let mut search_map = [[0usize; SEARCH_DEPTH + 1]; 10];
-    search_map[0][0] = 1;
-    search_map[0][1] = 1;
-    search_map[0][2] = 1;
-    search_map[0][3] = 2;
-    search_map[0][4] = 4;
-    search_map.iter_mut().take(5).skip(1).for_each(|sum| {
-        sum[0] = 1;
-        sum[1] = 1;
-        sum[2] = 2;
-        sum[3] = 4;
-        sum[4] = 4;
-    });
-    search_map.iter_mut().skip(5).for_each(|sum| {
-        sum[0] = 1;
-        sum[1] = 1;
-        sum[2] = 1;
-        sum[3] = 2;
-        sum[4] = 4;
-    });
-    for depth in 5..=SEARCH_DEPTH {
-        search_map[0][depth] = 2 * search_map[2][depth - 4] + search_map[0][depth - 4] + search_map[4][depth - 4];
-        search_map[1][depth] = 2 * search_map[2][depth - 3] + search_map[0][depth - 3] + search_map[4][depth - 3];
-        search_map[2][depth] = 2 * search_map[4][depth - 3] + search_map[0][depth - 3] + search_map[8][depth - 3];
-        search_map[3][depth] =
-            search_map[6][depth - 3] + search_map[0][depth - 3] + search_map[7][depth - 3] + search_map[2][depth - 3];
-        search_map[4][depth] =
-            search_map[8][depth - 3] + search_map[0][depth - 3] + search_map[9][depth - 3] + search_map[6][depth - 3];
-        search_map[5][depth] = 2 * search_map[0][depth - 5]
-            + 2 * search_map[2][depth - 5]
-            + search_map[4][depth - 5]
-            + 3 * search_map[8][depth - 5];
-        search_map[6][depth] = search_map[2][depth - 5]
-            + 2 * search_map[4][depth - 5]
-            + 2 * search_map[5][depth - 5]
-            + search_map[6][depth - 5]
-            + search_map[7][depth - 5]
-            + search_map[9][depth - 5];
-        search_map[7][depth] = search_map[0][depth - 5]
-            + 2 * search_map[2][depth - 5]
-            + search_map[3][depth - 5]
-            + 2 * search_map[6][depth - 5]
-            + search_map[7][depth - 5]
-            + search_map[8][depth - 5];
-        search_map[8][depth] = 2 * search_map[2][depth - 5]
-            + search_map[3][depth - 5]
-            + search_map[6][depth - 5]
-            + 2 * search_map[7][depth - 5]
-            + search_map[8][depth - 4];
-        search_map[9][depth] = search_map[1][depth - 5]
-            + search_map[3][depth - 5]
-            + search_map[4][depth - 5]
-            + 2 * search_map[6][depth - 5]
-            + 2 * search_map[8][depth - 5]
-            + search_map[9][depth - 5];
-    }
-
+pub fn garden_groups(input: &str) -> usize {
     let bytes = input.as_bytes();
-    let mut stones = [0usize; 10];
-    let mut stones_len = 0;
+
+    let mut islands = [0usize; 26];
+    let mut previous_line = [b'/'; 140];
+    let mut current_line = [b'/'; 140];
 
     let mut i = 0;
+    let mut j = 0;
+    let mut sum = 0;
 
-    loop {
-        while bytes[i] <= b'9' && bytes[i] >= b'0' {
-            stones[stones_len] = stones[stones_len] * 10 + bytes[i] as usize - 0x30;
-            i += 1;
+    while j < bytes.len() {
+        if bytes[j] == b'\n' {
+            previous_line = current_line;
+            current_line = [b'/'; 140];
+            i = 0;
+            j += 1;
+            continue;
         }
-        stones_len += 1;
-        if bytes[i] == b'\n' {
-            break;
-        }
-        i += 1;
-    }
-
-    stones[0..stones_len]
-        .par_iter()
-        .map(|stone| transform_count_search(*stone, SEARCH_DEPTH, &search_map))
-        .sum()
-}
-
-fn transform_count_search(value: usize, mut depth: usize, search_map: &[[usize; SEARCH_DEPTH + 1]; 10]) -> usize {
-    if depth == 0 {
-        return 1;
-    }
-
-    if value.div_euclid(10) == 0 {
-        return search_map[value][depth];
-    }
-
-    depth -= 1;
-
-    if value == 0 {
-        return transform_count_search(1, depth, search_map);
-    }
-
-    let length = value.checked_ilog10().unwrap_or(0) + 1;
-    if length.rem_euclid(2) == 0 {
-        let middle = 10usize.pow(length.div_euclid(2));
-        if SEARCH_DEPTH - depth < SEARCH_DEPTH.div_ceil(2) {
-            let values = [value.div_euclid(middle), value.rem_euclid(middle)];
-            values
-                .par_iter()
-                .map(|value| transform_count_search(*value, depth, search_map))
-                .sum()
+        let value = bytes[j] - b'A';
+        if previous_line[i] == value && i > 0 && current_line[i - 1] == value {
+            // idk
+        } else if previous_line[i] == value || (i > 0 && current_line[i - 1] == value) {
+            islands[value as usize] += 2;
         } else {
-            let left = value.div_euclid(middle);
-            let right = value.rem_euclid(middle);
-            transform_count_search(left, depth, search_map) + transform_count_search(right, depth, search_map)
+            sum += islands[value as usize] * value as usize;
+            println!("{} : {}", char::from(value + b'A'), islands[value as usize]);
+            islands[value as usize] = 4;
         }
-    } else {
-        transform_count_search(value * 2024, depth, search_map)
+        current_line[i] = value;
+        i += 1;
+        j += 1;
     }
+
+    for x in j - i..j {
+        sum += islands[x] * x;
+        println!("{} : {}", char::from(x as u8 + b'A'), islands[x]);
+    }
+
+    sum
 }
