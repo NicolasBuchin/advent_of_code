@@ -5,6 +5,6 @@ fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
     let solution = garden_groups(&input);
-    assert_eq!(solution, 1930);
+    assert_eq!(solution, 1206);
     println!("count: {}", solution);
 }
