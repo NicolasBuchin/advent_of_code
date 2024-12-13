@@ -1,154 +1,51 @@
-pub fn garden_groups(input: &str) -> usize {
-    let mut input_clone = input.to_owned();
-    let bytes = unsafe { input_clone.as_bytes_mut() };
+pub fn claw_contraption(input: &str) -> usize {
+    let bytes = input.as_bytes();
+    let mut score = 0;
+    let mut i = 12;
 
-    let line_size = {
-        let mut i = 0;
-        while bytes[i] != b'\n' {
+    while i < bytes.len() {
+        let ax = (bytes[i] as usize - 0x30) * 10 + (bytes[i + 1] as usize - 0x30);
+        i += 6;
+        let ay = (bytes[i] as usize - 0x30) * 10 + (bytes[i + 1] as usize - 0x30);
+        i += 15;
+        let bx = (bytes[i] as usize - 0x30) * 10 + (bytes[i + 1] as usize - 0x30);
+        i += 6;
+        let by = (bytes[i] as usize - 0x30) * 10 + (bytes[i + 1] as usize - 0x30);
+        i += 12;
+
+        let mut prize_x = 0;
+        while bytes[i] != b',' {
+            prize_x *= 10;
+            prize_x += bytes[i] as usize - 0x30;
             i += 1;
         }
-        i + 1
-    };
 
-    let mut total = 0;
+        i += 4;
 
-    let mut map = [(false, false, false, false); 141 * 140];
-
-    for i in 0..bytes.len() {
-        let value = bytes[i];
-        if value > b'Z' || value == b'\n' {
-            continue;
+        let mut prize_y = 0;
+        while bytes[i] != b'\n' {
+            prize_y *= 10;
+            prize_y += bytes[i] as usize - 0x30;
+            i += 1;
         }
-        let n = map_garden_area(value, i, bytes, line_size, &mut map);
-        let w = count_walls(&map, line_size);
-        println!("{} {}", n, w);
-        total += n * w;
-        map = [(false, false, false, false); 141 * 140];
+
+        i += 14;
+
+        score += solve(ax, ay, bx, by, prize_x, prize_y);
     }
 
-    total
+    score
 }
 
-fn map_garden_area(
-    value: u8,
-    i: usize,
-    bytes: &mut [u8],
-    line_size: usize,
-    map: &mut [(bool, bool, bool, bool)],
-) -> usize {
-    bytes[i] += 32;
-    let rem = i.rem_euclid(line_size);
-    let (mut fu, mut fd, mut fl, mut fr) = (false, false, false, false);
-    let mut num = 1;
-    if i >= line_size {
-        if bytes[i - line_size] == value {
-            num += map_garden_area(value, i - line_size, bytes, line_size, map);
-        } else if bytes[i - line_size] != bytes[i] {
-            fu |= true;
-        }
-    } else {
-        fu |= true;
-    }
-    if i < bytes.len() - line_size {
-        if bytes[i + line_size] == value {
-            num += map_garden_area(value, i + line_size, bytes, line_size, map);
-        } else if bytes[i + line_size] != bytes[i] {
-            fd |= true;
-        }
-    } else {
-        fd |= true;
-    }
-    if rem > 0 {
-        if bytes[i - 1] == value {
-            num += map_garden_area(value, i - 1, bytes, line_size, map);
-        } else if bytes[i - 1] != bytes[i] {
-            fl |= true;
-        }
-    } else {
-        fl |= true;
-    }
-    if rem < line_size - 1 {
-        if bytes[i + 1] == value {
-            num += map_garden_area(value, i + 1, bytes, line_size, map);
-        } else if bytes[i + 1] != bytes[i] {
-            fr |= true;
-        }
-    } else {
-        fr |= true;
-    }
-    map[i] = (fu, fd, fl, fr);
-    num
-}
-fn count_walls(map: &[(bool, bool, bool, bool)], line_size: usize) -> usize {
-    let mut wall_count = 0;
-
-    // Horizontal walls (above)
-    for row in 0..map.len() / line_size {
-        let mut in_wall = false;
-        for col in 0..line_size {
-            let index = row * line_size + col;
-            if map[index].0 {
-                // Check for a wall above
-                if !in_wall {
-                    wall_count += 1;
-                    in_wall = true;
-                }
-            } else {
-                in_wall = false;
+fn solve(ax: usize, ay: usize, bx: usize, by: usize, prize_x: usize, prize_y: usize) -> usize {
+    let mut best_score = 0usize;
+    for ac in 0..=100 {
+        for bc in 0..100 {
+            let score = ac * 3 + bc;
+            if ac * ax + bc * bx == prize_x && ac * ay + bc * by == prize_y && (score < best_score || best_score == 0) {
+                best_score = score;
             }
         }
     }
-
-    // Horizontal walls (below)
-    for row in 0..map.len() / line_size {
-        let mut in_wall = false;
-        for col in 0..line_size {
-            let index = row * line_size + col;
-            if map[index].1 {
-                // Check for a wall below
-                if !in_wall {
-                    wall_count += 1;
-                    in_wall = true;
-                }
-            } else {
-                in_wall = false;
-            }
-        }
-    }
-
-    // Vertical walls (left)
-    for col in 0..line_size {
-        let mut in_wall = false;
-        for row in 0..map.len() / line_size {
-            let index = row * line_size + col;
-            if map[index].2 {
-                // Check for a wall to the left
-                if !in_wall {
-                    wall_count += 1;
-                    in_wall = true;
-                }
-            } else {
-                in_wall = false;
-            }
-        }
-    }
-
-    // Vertical walls (right)
-    for col in 0..line_size {
-        let mut in_wall = false;
-        for row in 0..map.len() / line_size {
-            let index = row * line_size + col;
-            if map[index].3 {
-                // Check for a wall to the right
-                if !in_wall {
-                    wall_count += 1;
-                    in_wall = true;
-                }
-            } else {
-                in_wall = false;
-            }
-        }
-    }
-
-    wall_count
+    best_score
 }
