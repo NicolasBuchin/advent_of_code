@@ -12,116 +12,143 @@ pub fn garden_groups(input: &str) -> usize {
 
     let mut total = 0;
 
-    let mut walls = [(false, false, false, false); 141 * 140];
+    let mut map = [(false, false, false, false); 141 * 140];
 
     for i in 0..bytes.len() {
         let value = bytes[i];
         if value > b'Z' || value == b'\n' {
             continue;
         }
-        let (n, w) = garden_area(value, i, bytes, line_size, &mut walls);
+        let n = map_garden_area(value, i, bytes, line_size, &mut map);
+        let w = count_walls(&map, line_size);
+        println!("{} {}", n, w);
         total += n * w;
+        map = [(false, false, false, false); 141 * 140];
     }
 
     total
 }
 
-fn garden_area(
+fn map_garden_area(
     value: u8,
     i: usize,
     bytes: &mut [u8],
     line_size: usize,
-    walls: &mut [(bool, bool, bool, bool)],
-) -> (usize, usize) {
-    bytes[i] += 26;
-    let (mut num, mut walls_count) = (1, 0);
+    map: &mut [(bool, bool, bool, bool)],
+) -> usize {
+    bytes[i] += 32;
+    let rem = i.rem_euclid(line_size);
     let (mut fu, mut fd, mut fl, mut fr) = (false, false, false, false);
-    let (mut nu, mut nd, mut nl, mut nr) = (false, false, false, false);
+    let mut num = 1;
     if i >= line_size {
         if bytes[i - line_size] == value {
-            let (n, w) = garden_area(value, i - line_size, bytes, line_size, walls);
-            num += n;
-            walls_count += w;
-            nl |= walls[i - line_size].2;
-            nr |= walls[i - line_size].3;
-        } else if bytes[i - line_size] == bytes[i] {
-            nl |= walls[i - line_size].2;
-            nr |= walls[i - line_size].3;
-        } else {
-            walls_count += 1;
+            num += map_garden_area(value, i - line_size, bytes, line_size, map);
+        } else if bytes[i - line_size] != bytes[i] {
             fu |= true;
         }
     } else {
-        walls_count += 1;
         fu |= true;
     }
     if i < bytes.len() - line_size {
         if bytes[i + line_size] == value {
-            let (n, w) = garden_area(value, i + line_size, bytes, line_size, walls);
-            num += n;
-            walls_count += w;
-            nl |= walls[i + line_size].2;
-            nr |= walls[i + line_size].3;
-        } else if bytes[i + line_size] == bytes[i] {
-            nl |= walls[i + line_size].2;
-            nr |= walls[i + line_size].3;
-        } else {
-            walls_count += 1;
+            num += map_garden_area(value, i + line_size, bytes, line_size, map);
+        } else if bytes[i + line_size] != bytes[i] {
             fd |= true;
         }
     } else {
-        walls_count += 1;
         fd |= true;
     }
-    let rem = i.rem_euclid(line_size);
     if rem > 0 {
         if bytes[i - 1] == value {
-            let (n, w) = garden_area(value, i - 1, bytes, line_size, walls);
-            num += n;
-            walls_count += w;
-            nu |= walls[i - 1].0;
-            nd |= walls[i - 1].1;
-        } else if bytes[i - 1] == bytes[i] {
-            nu |= walls[i - 1].0;
-            nd |= walls[i - 1].1;
-        } else {
-            walls_count += 1;
+            num += map_garden_area(value, i - 1, bytes, line_size, map);
+        } else if bytes[i - 1] != bytes[i] {
             fl |= true;
         }
     } else {
-        walls_count += 1;
         fl |= true;
     }
     if rem < line_size - 1 {
         if bytes[i + 1] == value {
-            let (n, w) = garden_area(value, i + 1, bytes, line_size, walls);
-            num += n;
-            walls_count += w;
-            nu |= walls[i + 1].0;
-            nd |= walls[i + 1].1;
-        } else if bytes[i + 1] == bytes[i] {
-            nu |= walls[i + 1].0;
-            nd |= walls[i + 1].1;
-        } else {
-            walls_count += 1;
+            num += map_garden_area(value, i + 1, bytes, line_size, map);
+        } else if bytes[i + 1] != bytes[i] {
             fr |= true;
         }
     } else {
-        walls_count += 1;
         fr |= true;
     }
-    if fu && nu {
-        walls_count -= 1;
+    map[i] = (fu, fd, fl, fr);
+    num
+}
+fn count_walls(map: &[(bool, bool, bool, bool)], line_size: usize) -> usize {
+    let mut wall_count = 0;
+
+    // Horizontal walls (above)
+    for row in 0..map.len() / line_size {
+        let mut in_wall = false;
+        for col in 0..line_size {
+            let index = row * line_size + col;
+            if map[index].0 {
+                // Check for a wall above
+                if !in_wall {
+                    wall_count += 1;
+                    in_wall = true;
+                }
+            } else {
+                in_wall = false;
+            }
+        }
     }
-    if fd && nd {
-        walls_count -= 1;
+
+    // Horizontal walls (below)
+    for row in 0..map.len() / line_size {
+        let mut in_wall = false;
+        for col in 0..line_size {
+            let index = row * line_size + col;
+            if map[index].1 {
+                // Check for a wall below
+                if !in_wall {
+                    wall_count += 1;
+                    in_wall = true;
+                }
+            } else {
+                in_wall = false;
+            }
+        }
     }
-    if fl && nl {
-        walls_count -= 1;
+
+    // Vertical walls (left)
+    for col in 0..line_size {
+        let mut in_wall = false;
+        for row in 0..map.len() / line_size {
+            let index = row * line_size + col;
+            if map[index].2 {
+                // Check for a wall to the left
+                if !in_wall {
+                    wall_count += 1;
+                    in_wall = true;
+                }
+            } else {
+                in_wall = false;
+            }
+        }
     }
-    if fr && nr {
-        walls_count -= 1;
+
+    // Vertical walls (right)
+    for col in 0..line_size {
+        let mut in_wall = false;
+        for row in 0..map.len() / line_size {
+            let index = row * line_size + col;
+            if map[index].3 {
+                // Check for a wall to the right
+                if !in_wall {
+                    wall_count += 1;
+                    in_wall = true;
+                }
+            } else {
+                in_wall = false;
+            }
+        }
     }
-    walls[i] = (fu, fd, fl, fr);
-    (num, walls_count)
+
+    wall_count
 }
