@@ -1,5 +1,7 @@
+use std::collections::HashSet;
+
 const SIZE: (i32, i32) = (101, 103);
-const DURATION: i32 = 100;
+const DURATION: usize = 10000;
 
 #[derive(Default, Clone, Copy, Debug)]
 struct Robot {
@@ -8,31 +10,65 @@ struct Robot {
 }
 
 pub fn claw_contraption(input: &str) -> usize {
-    let robots = parse(input);
+    let mut robots = parse(input);
 
-    let mut quadrants = [0; 4];
+    let mut robots_set = HashSet::new();
 
-    for mut robot in robots {
-        robot.position.0 += robot.velocity.0 * DURATION;
-        robot.position.1 += robot.velocity.1 * DURATION;
+    for d in 0..DURATION {
+        for robot in &mut robots {
+            robot.position.0 += robot.velocity.0;
+            robot.position.1 += robot.velocity.1;
 
-        robot.position.0 = robot.position.0.rem_euclid(SIZE.0);
-        robot.position.1 = robot.position.1.rem_euclid(SIZE.1);
+            robot.position.0 = robot.position.0.rem_euclid(SIZE.0);
+            robot.position.1 = robot.position.1.rem_euclid(SIZE.1);
 
-        if robot.position.0 < SIZE.0 / 2 && robot.position.1 < SIZE.1 / 2 {
-            quadrants[0] += 1;
-        } else if robot.position.0 > SIZE.0 / 2 && robot.position.1 < SIZE.1 / 2 {
-            quadrants[1] += 1;
-        } else if robot.position.0 < SIZE.0 / 2 && robot.position.1 > SIZE.1 / 2 {
-            quadrants[2] += 1;
-        } else if robot.position.0 > SIZE.0 / 2 && robot.position.1 > SIZE.1 / 2 {
-            quadrants[3] += 1;
+            robots_set.insert((robot.position.0, robot.position.1));
         }
 
-        // println!("{:?}", robot);
+        if has_tree(&robots_set) {
+            println!("AT: {}", d);
+            show(&robots_set);
+            return d + 1;
+        }
+
+        robots_set.clear();
     }
 
-    quadrants[0] * quadrants[1] * quadrants[2] * quadrants[3]
+    0
+}
+
+fn has_tree(robots_set: &HashSet<(i32, i32)>) -> bool {
+    for (x, y) in robots_set {
+        let mut found = true;
+        for i in -2..=2 {
+            for j in -2..=2 {
+                if !robots_set.contains(&(x + i, y + j)) {
+                    found = false;
+                    break;
+                }
+            }
+            if !found {
+                break;
+            }
+        }
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+fn show(robots_set: &HashSet<(i32, i32)>) {
+    for i in 0..SIZE.0 {
+        for j in 0..SIZE.1 {
+            if robots_set.contains(&(i, j)) {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        println!();
+    }
 }
 
 fn parse(input: &str) -> Vec<Robot> {

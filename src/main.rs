@@ -5,6 +5,6 @@ fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
     let solution = claw_contraption(&input);
-    assert_eq!(solution, 224554908);
+    assert_eq!(solution, 6644);
     println!("count: {}", solution);
 }
