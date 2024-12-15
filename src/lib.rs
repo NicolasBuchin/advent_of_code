@@ -1,173 +1,150 @@
 use std::collections::HashSet;
 
-const SIZE: (i32, i32) = (101, 103);
-const DURATION: usize = 10000;
+pub fn warehouse_woes(input: &str) -> usize {
+    let bytes = input.as_bytes();
 
-#[derive(Default, Clone, Copy, Debug)]
-struct Robot {
-    pub position: (i32, i32),
-    pub velocity: (i32, i32),
-}
+    let mut walls = HashSet::new();
+    let mut boxes = HashSet::new();
+    let mut robot = (0, 0);
 
-pub fn claw_contraption(input: &str) -> usize {
-    let mut robots = parse(input);
+    let (mut x, mut y) = (0, 0);
+    let mut width = 0;
+    let mut i = 0;
 
-    let mut robots_set = HashSet::new();
-
-    for d in 0..DURATION {
-        for robot in &mut robots {
-            robot.position.0 += robot.velocity.0;
-            robot.position.1 += robot.velocity.1;
-
-            robot.position.0 = robot.position.0.rem_euclid(SIZE.0);
-            robot.position.1 = robot.position.1.rem_euclid(SIZE.1);
-
-            robots_set.insert((robot.position.0, robot.position.1));
-        }
-
-        if has_tree(&robots_set) {
-            println!("AT: {}", d);
-            show(&robots_set);
-            return d + 1;
-        }
-
-        robots_set.clear();
-    }
-
-    0
-}
-
-fn has_tree(robots_set: &HashSet<(i32, i32)>) -> bool {
-    for (x, y) in robots_set {
-        let mut found = true;
-        for i in -2..=2 {
-            for j in -2..=2 {
-                if !robots_set.contains(&(x + i, y + j)) {
-                    found = false;
+    loop {
+        let b = bytes[i];
+        match b {
+            b'\n' => {
+                if x == 0 {
+                    i += 1;
                     break;
                 }
+                width = x;
+                x = 0;
+                y += 1;
             }
-            if !found {
-                break;
+            b'#' => {
+                walls.insert((x, y));
+                x += 1;
             }
+            b'O' => {
+                boxes.insert((x, y));
+                x += 1;
+            }
+            b'@' => {
+                robot = (x, y);
+                x += 1;
+            }
+            b'.' => {
+                x += 1;
+            }
+            _ => (),
         }
-        if found {
-            return true;
-        }
+        i += 1;
     }
-    false
+
+    // show_puzzle(&robot, &walls, &boxes, width, y);
+
+    while i < bytes.len() {
+        let b = bytes[i];
+        match b {
+            b'^' => try_move_robot(&mut robot, Direction::N, &walls, &mut boxes),
+            b'v' => try_move_robot(&mut robot, Direction::S, &walls, &mut boxes),
+            b'<' => try_move_robot(&mut robot, Direction::W, &walls, &mut boxes),
+            b'>' => try_move_robot(&mut robot, Direction::E, &walls, &mut boxes),
+            _ => (),
+        }
+        i += 1;
+
+        // if b == b'\n' {
+        //     continue;
+        // }
+        // println!("move = {}", char::from(b));
+        // show_puzzle(&robot, &walls, &boxes, width, y);
+        // println!();
+    }
+
+    boxes.iter().map(|(i, j)| i + j * 100).sum()
 }
 
-fn show(robots_set: &HashSet<(i32, i32)>) {
-    for i in 0..SIZE.0 {
-        for j in 0..SIZE.1 {
-            if robots_set.contains(&(i, j)) {
+enum Direction {
+    N,
+    S,
+    W,
+    E,
+}
+
+fn try_move_robot(
+    robot: &mut (usize, usize),
+    direction: Direction,
+    walls: &HashSet<(usize, usize)>,
+    boxes: &mut HashSet<(usize, usize)>,
+) {
+    let next = next_position(*robot, &direction);
+    if walls.contains(&next) {
+        return;
+    }
+    if boxes.contains(&next) {
+        if try_move_box(next, direction, walls, boxes) {
+            *robot = next;
+        }
+    } else {
+        *robot = next;
+    }
+}
+
+fn try_move_box(
+    box_position: (usize, usize),
+    direction: Direction,
+    walls: &HashSet<(usize, usize)>,
+    boxes: &mut HashSet<(usize, usize)>,
+) -> bool {
+    let next = next_position(box_position, &direction);
+    if walls.contains(&next) {
+        false
+    } else if boxes.contains(&next) {
+        let moved = try_move_box(next, direction, walls, boxes);
+        if moved {
+            boxes.remove(&box_position);
+            boxes.insert(next);
+        }
+        moved
+    } else {
+        boxes.remove(&box_position);
+        boxes.insert(next);
+        true
+    }
+}
+
+fn next_position(position: (usize, usize), direction: &Direction) -> (usize, usize) {
+    match direction {
+        Direction::N => (position.0, position.1 - 1),
+        Direction::S => (position.0, position.1 + 1),
+        Direction::W => (position.0 - 1, position.1),
+        Direction::E => (position.0 + 1, position.1),
+    }
+}
+
+fn show_puzzle(
+    robot: &(usize, usize),
+    walls: &HashSet<(usize, usize)>,
+    boxes: &HashSet<(usize, usize)>,
+    width: usize,
+    height: usize,
+) {
+    for j in 0..height {
+        for i in 0..width {
+            let position = (i, j);
+            if walls.contains(&position) {
                 print!("#");
+            } else if boxes.contains(&position) {
+                print!("O");
+            } else if position == *robot {
+                print!("@");
             } else {
-                print!(".");
+                print!(".")
             }
         }
         println!();
     }
-}
-
-fn parse(input: &str) -> Vec<Robot> {
-    let bytes = input.as_bytes();
-    let mut robots = Vec::new();
-
-    let mut i = 2;
-
-    let mut number = 0;
-    let mut positive = true;
-
-    while i < bytes.len() {
-        let mut robot = Robot::default();
-
-        if bytes[i] == b'-' {
-            positive = false;
-            i += 1;
-        }
-        while bytes[i] != b',' {
-            number *= 10;
-            number += bytes[i] as i32 - 0x30;
-            i += 1;
-        }
-
-        if positive {
-            robot.position.0 = number
-        } else {
-            robot.position.0 = -number
-        }
-
-        i += 1;
-
-        number = 0;
-        positive = true;
-
-        if bytes[i] == b'-' {
-            positive = false;
-            i += 1;
-        }
-        while bytes[i] != b' ' {
-            number *= 10;
-            number += bytes[i] as i32 - 0x30;
-            i += 1;
-        }
-
-        if positive {
-            robot.position.1 = number
-        } else {
-            robot.position.1 = -number
-        }
-
-        i += 3;
-
-        number = 0;
-        positive = true;
-
-        if bytes[i] == b'-' {
-            positive = false;
-            i += 1;
-        }
-        while bytes[i] != b',' {
-            number *= 10;
-            number += bytes[i] as i32 - 0x30;
-            i += 1;
-        }
-
-        if positive {
-            robot.velocity.0 = number
-        } else {
-            robot.velocity.0 = -number
-        }
-
-        i += 1;
-
-        number = 0;
-        positive = true;
-
-        if bytes[i] == b'-' {
-            positive = false;
-            i += 1;
-        }
-        while bytes[i] != b'\n' {
-            number *= 10;
-            number += bytes[i] as i32 - 0x30;
-            i += 1;
-        }
-
-        if positive {
-            robot.velocity.1 = number
-        } else {
-            robot.velocity.1 = -number
-        }
-
-        i += 3;
-        number = 0;
-        positive = true;
-
-        robots.push(robot);
-    }
-
-    robots
 }

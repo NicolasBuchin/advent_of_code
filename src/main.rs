@@ -1,10 +1,10 @@
-use advent_of_code::claw_contraption;
+use advent_of_code::warehouse_woes;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    let solution = claw_contraption(&input);
-    assert_eq!(solution, 6644);
+    let solution = warehouse_woes(&input);
+    assert_eq!(solution, 1526018);
     println!("count: {}", solution);
 }
