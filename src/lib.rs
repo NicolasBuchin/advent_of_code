@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet},
+    collections::{BinaryHeap, HashMap, HashSet},
 };
 
 pub fn reindeer_maze(input: &str) -> usize {
@@ -46,55 +46,23 @@ pub fn reindeer_maze(input: &str) -> usize {
     find_path(start, end, &walls, x, y)
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct Tile {
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct State {
+    cost: usize,
     position: (usize, usize),
-    g_score: usize,
-    f_score: usize,
-    direction: (isize, isize), // Direction of movement to this Tile
+    direction: (i32, i32),
 }
 
-impl Ord for Tile {
+impl Ord for State {
     fn cmp(&self, other: &Self) -> Ordering {
-        other
-            .f_score
-            .cmp(&self.f_score)
-            .then_with(|| other.g_score.cmp(&self.g_score))
+        other.cost.cmp(&self.cost)
     }
 }
 
-impl PartialOrd for Tile {
+impl PartialOrd for State {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
-}
-
-fn heuristic(a: (usize, usize), b: (usize, usize)) -> usize {
-    a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
-}
-
-fn get_neighbors(
-    position: (usize, usize),
-    walls: &HashSet<(usize, usize)>,
-    width: usize,
-    height: usize,
-) -> Vec<(usize, usize)> {
-    let mut neighbors = Vec::new();
-
-    if position.0 > 0 && !walls.contains(&(position.0 - 1, position.1)) {
-        neighbors.push((position.0 - 1, position.1));
-    }
-    if position.0 < width - 1 && !walls.contains(&(position.0 + 1, position.1)) {
-        neighbors.push((position.0 + 1, position.1));
-    }
-    if position.1 > 0 && !walls.contains(&(position.0, position.1 - 1)) {
-        neighbors.push((position.0, position.1 - 1));
-    }
-    if position.1 < height - 1 && !walls.contains(&(position.0, position.1 + 1)) {
-        neighbors.push((position.0, position.1 + 1));
-    }
-
-    neighbors
 }
 
 pub fn find_path(
@@ -104,60 +72,62 @@ pub fn find_path(
     width: usize,
     height: usize,
 ) -> usize {
-    let mut open_set = BinaryHeap::new();
-    let mut came_from: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
+    let mut heap = BinaryHeap::new();
+    let mut visited = HashSet::new();
 
-    let mut g_scores: HashMap<(usize, usize), usize> = HashMap::new();
-    g_scores.insert(start, 0);
-
-    let mut f_scores: HashMap<(usize, usize), usize> = HashMap::new();
-    f_scores.insert(start, heuristic(start, end));
-
-    open_set.push(Tile {
+    heap.push(State {
+        cost: 0,
         position: start,
-        g_score: 0,
-        f_score: heuristic(start, end),
         direction: (1, 0),
     });
 
-    while let Some(current_tile) = open_set.pop() {
-        let current = current_tile.position;
-        let current_direction = current_tile.direction;
+    let directions = [(1, 0), (0, 1), (-1, 0), (0, -1)];
 
-        if current == end {
-            return *g_scores.get(&current).unwrap();
+    while let Some(State {
+        cost,
+        position,
+        direction,
+    }) = heap.pop()
+    {
+        if position == end {
+            return cost;
         }
 
-        for neighbor in get_neighbors(current, walls, width, height) {
-            let direction = (
-                neighbor.0 as isize - current.0 as isize,
-                neighbor.1 as isize - current.1 as isize,
-            );
+        let visit_key = (position, direction);
+        if !visited.insert(visit_key) {
+            continue;
+        }
 
-            let turn_penalty = {
-                if direction != current_direction {
-                    1000
-                } else {
-                    0
-                }
+        for &next_dir in directions.iter() {
+            let (x, y) = position;
+            let new_x = x as i32 + next_dir.0;
+            let new_y = y as i32 + next_dir.1;
+
+            if new_x < 0 || new_x >= width as i32 || new_y < 0 || new_y >= height as i32 {
+                continue;
+            }
+
+            let new_pos = (new_x as usize, new_y as usize);
+
+            if walls.contains(&new_pos) {
+                continue;
+            }
+
+            let movement_cost = 1;
+            let direction_change_cost = if direction != next_dir { 1000 } else { 0 };
+            let new_cost = cost + movement_cost + direction_change_cost;
+
+            let new_state = State {
+                cost: new_cost,
+                position: new_pos,
+                direction: next_dir,
             };
 
-            let g_score = g_scores.get(&current).unwrap() + 1 + turn_penalty;
-
-            if let Entry::Vacant(entry) = g_scores.entry(neighbor) {
-                entry.insert(g_score);
-                came_from.insert(neighbor, current);
-                let f_score = g_score + heuristic(neighbor, end);
-                f_scores.insert(neighbor, f_score);
-
-                open_set.push(Tile {
-                    position: neighbor,
-                    g_score,
-                    f_score,
-                    direction,
-                });
+            if !visited.contains(&(new_pos, next_dir)) {
+                heap.push(new_state);
             }
         }
     }
-    0
+
+    usize::MAX
 }
