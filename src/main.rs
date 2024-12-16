@@ -5,6 +5,6 @@ fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
     let solution = reindeer_maze(&input);
-    assert_eq!(solution, 73432);
+    assert_eq!(solution, 496);
     println!("count: {}", solution);
 }

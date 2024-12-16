@@ -43,7 +43,7 @@ pub fn reindeer_maze(input: &str) -> usize {
         i += 1;
     }
 
-    find_path(start, end, &walls, x, y)
+    find_path_unique_tiles(start, end, &walls, x, y)
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -65,7 +65,8 @@ impl PartialOrd for State {
     }
 }
 
-pub fn find_path(
+#[allow(clippy::type_complexity, clippy::comparison_chain)]
+pub fn find_path_unique_tiles(
     start: (usize, usize),
     end: (usize, usize),
     walls: &HashSet<(usize, usize)>,
@@ -73,15 +74,20 @@ pub fn find_path(
     height: usize,
 ) -> usize {
     let mut heap = BinaryHeap::new();
-    let mut visited = HashSet::new();
+    let mut predecessors: HashMap<((usize, usize), (i32, i32)), HashSet<((usize, usize), (i32, i32))>> = HashMap::new();
+    let mut costs = HashMap::new();
 
-    heap.push(State {
+    let initial_state = State {
         cost: 0,
         position: start,
         direction: (1, 0),
-    });
+    };
+    heap.push(initial_state);
+    costs.insert((start, (1, 0)), 0);
 
     let directions = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+    let mut min_cost_to_end = usize::MAX;
+    let mut end_states = HashSet::new();
 
     while let Some(State {
         cost,
@@ -89,12 +95,23 @@ pub fn find_path(
         direction,
     }) = heap.pop()
     {
-        if position == end {
-            return cost;
+        if cost > min_cost_to_end {
+            break;
         }
 
-        let visit_key = (position, direction);
-        if !visited.insert(visit_key) {
+        if position == end {
+            if cost < min_cost_to_end {
+                min_cost_to_end = cost;
+                end_states.clear();
+            }
+            if cost == min_cost_to_end {
+                end_states.insert((position, direction));
+            }
+            continue;
+        }
+
+        let current_best = costs.get(&(position, direction)).copied().unwrap_or(usize::MAX);
+        if cost > current_best {
             continue;
         }
 
@@ -113,21 +130,62 @@ pub fn find_path(
                 continue;
             }
 
-            let movement_cost = 1;
             let direction_change_cost = if direction != next_dir { 1000 } else { 0 };
-            let new_cost = cost + movement_cost + direction_change_cost;
+            let new_cost = cost + direction_change_cost + 1;
 
-            let new_state = State {
-                cost: new_cost,
-                position: new_pos,
-                direction: next_dir,
-            };
+            let next_state = (new_pos, next_dir);
+            let current_state = (position, direction);
 
-            if !visited.contains(&(new_pos, next_dir)) {
-                heap.push(new_state);
+            match costs.get(&next_state) {
+                Some(&existing_cost) => {
+                    if new_cost < existing_cost {
+                        costs.insert(next_state, new_cost);
+                        let pred_set = predecessors.entry(next_state).or_default();
+                        pred_set.clear();
+                        pred_set.insert(current_state);
+                        heap.push(State {
+                            cost: new_cost,
+                            position: new_pos,
+                            direction: next_dir,
+                        });
+                    } else if new_cost == existing_cost {
+                        predecessors.entry(next_state).or_default().insert(current_state);
+                    }
+                }
+                None => {
+                    costs.insert(next_state, new_cost);
+                    predecessors.entry(next_state).or_default().insert(current_state);
+                    heap.push(State {
+                        cost: new_cost,
+                        position: new_pos,
+                        direction: next_dir,
+                    });
+                }
             }
         }
     }
 
-    usize::MAX
+    let mut unique_tiles = HashSet::new();
+    let mut stack = Vec::new();
+    let mut visited = HashSet::new();
+
+    for &end_state in &end_states {
+        stack.push(end_state);
+    }
+
+    while let Some(current_state) = stack.pop() {
+        unique_tiles.insert(current_state.0);
+        if current_state.0 == start {
+            continue;
+        }
+        if let Some(prev_states) = predecessors.get(&current_state) {
+            for &prev_state in prev_states {
+                if visited.insert((prev_state, current_state)) {
+                    stack.push(prev_state);
+                }
+            }
+        }
+    }
+
+    unique_tiles.len()
 }
