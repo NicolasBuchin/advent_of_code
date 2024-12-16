@@ -80,19 +80,18 @@ fn get_neighbors(
     height: usize,
 ) -> Vec<(usize, usize)> {
     let mut neighbors = Vec::new();
-    let (x, y) = position;
-    let directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]; // Right, Down, Left, Up
 
-    for (dx, dy) in directions {
-        let nx = x as isize + dx;
-        let ny = y as isize + dy;
-
-        if nx >= 0 && nx < width as isize && ny >= 0 && ny < height as isize {
-            let neighbor = (nx as usize, ny as usize);
-            if !walls.contains(&neighbor) {
-                neighbors.push(neighbor);
-            }
-        }
+    if position.0 > 0 && !walls.contains(&(position.0 - 1, position.1)) {
+        neighbors.push((position.0 - 1, position.1));
+    }
+    if position.0 < width - 1 && !walls.contains(&(position.0 + 1, position.1)) {
+        neighbors.push((position.0 + 1, position.1));
+    }
+    if position.1 > 0 && !walls.contains(&(position.0, position.1 - 1)) {
+        neighbors.push((position.0, position.1 - 1));
+    }
+    if position.1 < height - 1 && !walls.contains(&(position.0, position.1 + 1)) {
+        neighbors.push((position.0, position.1 + 1));
     }
 
     neighbors
