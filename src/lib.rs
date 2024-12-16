@@ -1,218 +1,164 @@
-use std::collections::HashSet;
+use std::{
+    cmp::Ordering,
+    collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet},
+};
 
-pub fn warehouse_woes(input: &str) -> usize {
+pub fn reindeer_maze(input: &str) -> usize {
     let bytes = input.as_bytes();
 
     let mut walls = HashSet::new();
-    let mut boxes = HashSet::new();
-    let mut robot = (0, 0);
+    let mut start = (0, 0);
+    let mut end = (0, 0);
 
     let (mut x, mut y) = (0, 0);
-    let mut width = 0;
     let mut i = 0;
 
     loop {
         let b = bytes[i];
         match b {
             b'\n' => {
-                if x == 0 {
-                    i += 1;
+                y += 1;
+                if i == bytes.len() - 1 {
                     break;
                 }
-                width = x;
                 x = 0;
-                y += 1;
             }
             b'#' => {
                 walls.insert((x, y));
-                walls.insert((x + 1, y));
-                x += 2;
+                x += 1;
             }
-            b'O' => {
-                boxes.insert((x, y));
-                x += 2;
+            b'S' => {
+                start = (x, y);
+                x += 1;
             }
-            b'@' => {
-                robot = (x, y);
-                x += 2;
+            b'E' => {
+                end = (x, y);
+                x += 1;
             }
             b'.' => {
-                x += 2;
+                x += 1;
             }
             _ => (),
         }
         i += 1;
     }
 
-    // show_puzzle(robot, &walls, &boxes, width, y);
+    find_path(start, end, &walls, x, y)
+}
 
-    while i < bytes.len() {
-        let b = bytes[i];
-        match b {
-            b'^' => try_move_robot(&mut robot, &Direction::N, &walls, &mut boxes),
-            b'v' => try_move_robot(&mut robot, &Direction::S, &walls, &mut boxes),
-            b'<' => try_move_robot(&mut robot, &Direction::W, &walls, &mut boxes),
-            b'>' => try_move_robot(&mut robot, &Direction::E, &walls, &mut boxes),
-            _ => (),
-        }
-        i += 1;
+#[derive(Debug, Eq, PartialEq)]
+struct Tile {
+    position: (usize, usize),
+    g_score: usize,
+    f_score: usize,
+    direction: (isize, isize), // Direction of movement to this Tile
+}
 
-        // if b == b'\n' {
-        //     continue;
-        // }
-        // println!("move = {}", char::from(b));
-        // show_puzzle(robot, &walls, &boxes, width, y);
-        // println!();
+impl Ord for Tile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .f_score
+            .cmp(&self.f_score)
+            .then_with(|| other.g_score.cmp(&self.g_score))
     }
-
-    // show_puzzle(robot, &walls, &boxes, width, y);
-
-    boxes.iter().map(|(i, j)| i + j * 100).sum()
 }
 
-enum Direction {
-    N,
-    S,
-    W,
-    E,
+impl PartialOrd for Tile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
-fn try_move_robot(
-    robot: &mut (usize, usize),
-    direction: &Direction,
+fn heuristic(a: (usize, usize), b: (usize, usize)) -> usize {
+    a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
+}
+
+fn get_neighbors(
+    position: (usize, usize),
     walls: &HashSet<(usize, usize)>,
-    boxes: &mut HashSet<(usize, usize)>,
-) {
-    let next = next_position(*robot, direction);
-    let next_left = (next.0 - 1, next.1);
-    if walls.contains(&next) {
-        return;
-    }
-    match *direction {
-        Direction::N => {
-            if can_move_box(next, direction, walls, boxes) && can_move_box(next_left, direction, walls, boxes) {
-                move_box(next, direction, boxes);
-                move_box(next_left, direction, boxes);
-                *robot = next;
-            }
-        }
-        Direction::S => {
-            if can_move_box(next, direction, walls, boxes) && can_move_box(next_left, direction, walls, boxes) {
-                move_box(next, direction, boxes);
-                move_box(next_left, direction, boxes);
-                *robot = next;
-            }
-        }
-        Direction::W => {
-            if can_move_box(next, direction, walls, boxes) && can_move_box(next_left, direction, walls, boxes) {
-                move_box(next, direction, boxes);
-                move_box(next_left, direction, boxes);
-                *robot = next;
-            }
-        }
-        Direction::E => {
-            if can_move_box(next, direction, walls, boxes) {
-                move_box(next, direction, boxes);
-                *robot = next;
-            }
-        }
-    }
-}
-
-fn can_move_box(
-    box_position: (usize, usize),
-    direction: &Direction,
-    walls: &HashSet<(usize, usize)>,
-    boxes: &mut HashSet<(usize, usize)>,
-) -> bool {
-    if !boxes.contains(&box_position) {
-        return true;
-    }
-    let next = next_position(box_position, direction);
-    let next_left = (next.0 - 1, next.1);
-    let next_right = (next.0 + 1, next.1);
-    if walls.contains(&next) || walls.contains(&next_right) {
-        return false;
-    }
-    match *direction {
-        Direction::N => {
-            can_move_box(next, direction, walls, boxes)
-                && can_move_box(next_left, direction, walls, boxes)
-                && can_move_box(next_right, direction, walls, boxes)
-        }
-        Direction::S => {
-            can_move_box(next, direction, walls, boxes)
-                && can_move_box(next_left, direction, walls, boxes)
-                && can_move_box(next_right, direction, walls, boxes)
-        }
-        Direction::W => can_move_box(next, direction, walls, boxes) && can_move_box(next_left, direction, walls, boxes),
-        Direction::E => {
-            can_move_box(next, direction, walls, boxes) && can_move_box(next_right, direction, walls, boxes)
-        }
-    }
-}
-
-fn move_box(box_position: (usize, usize), direction: &Direction, boxes: &mut HashSet<(usize, usize)>) {
-    if !boxes.contains(&box_position) {
-        return;
-    }
-    let next = next_position(box_position, direction);
-    let next_left = (next.0 - 1, next.1);
-    let next_right = (next.0 + 1, next.1);
-    match *direction {
-        Direction::N => {
-            move_box(next, direction, boxes);
-            move_box(next_left, direction, boxes);
-            move_box(next_right, direction, boxes);
-        }
-        Direction::S => {
-            move_box(next, direction, boxes);
-            move_box(next_left, direction, boxes);
-            move_box(next_right, direction, boxes);
-        }
-        Direction::W => {
-            move_box(next, direction, boxes);
-            move_box(next_left, direction, boxes);
-        }
-        Direction::E => {
-            move_box(next, direction, boxes);
-            move_box(next_right, direction, boxes);
-        }
-    }
-    boxes.remove(&box_position);
-    boxes.insert(next);
-}
-
-fn next_position(position: (usize, usize), direction: &Direction) -> (usize, usize) {
-    match direction {
-        Direction::N => (position.0, position.1 - 1),
-        Direction::S => (position.0, position.1 + 1),
-        Direction::W => (position.0 - 1, position.1),
-        Direction::E => (position.0 + 1, position.1),
-    }
-}
-
-fn show_puzzle(
-    robot: (usize, usize),
-    walls: &HashSet<(usize, usize)>,
-    boxes: &HashSet<(usize, usize)>,
     width: usize,
     height: usize,
-) {
-    for j in 0..height {
-        for i in 0..width {
-            if walls.contains(&(i, j)) {
-                print!("#");
-            } else if boxes.contains(&(i, j)) {
-                print!("[");
-            } else if i > 0 && boxes.contains(&(i - 1, j)) {
-                print!("]");
-            } else if (i, j) == robot {
-                print!("@");
-            } else {
-                print!(".")
+) -> Vec<(usize, usize)> {
+    let mut neighbors = Vec::new();
+    let (x, y) = position;
+    let directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]; // Right, Down, Left, Up
+
+    for (dx, dy) in directions {
+        let nx = x as isize + dx;
+        let ny = y as isize + dy;
+
+        if nx >= 0 && nx < width as isize && ny >= 0 && ny < height as isize {
+            let neighbor = (nx as usize, ny as usize);
+            if !walls.contains(&neighbor) {
+                neighbors.push(neighbor);
             }
         }
-        println!();
     }
+
+    neighbors
+}
+
+pub fn find_path(
+    start: (usize, usize),
+    end: (usize, usize),
+    walls: &HashSet<(usize, usize)>,
+    width: usize,
+    height: usize,
+) -> usize {
+    let mut open_set = BinaryHeap::new();
+    let mut came_from: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
+
+    let mut g_scores: HashMap<(usize, usize), usize> = HashMap::new();
+    g_scores.insert(start, 0);
+
+    let mut f_scores: HashMap<(usize, usize), usize> = HashMap::new();
+    f_scores.insert(start, heuristic(start, end));
+
+    open_set.push(Tile {
+        position: start,
+        g_score: 0,
+        f_score: heuristic(start, end),
+        direction: (1, 0),
+    });
+
+    while let Some(current_tile) = open_set.pop() {
+        let current = current_tile.position;
+        let current_direction = current_tile.direction;
+
+        if current == end {
+            return *g_scores.get(&current).unwrap();
+        }
+
+        for neighbor in get_neighbors(current, walls, width, height) {
+            let direction = (
+                neighbor.0 as isize - current.0 as isize,
+                neighbor.1 as isize - current.1 as isize,
+            );
+
+            let turn_penalty = {
+                if direction != current_direction {
+                    1000
+                } else {
+                    0
+                }
+            };
+
+            let g_score = g_scores.get(&current).unwrap() + 1 + turn_penalty;
+
+            if let Entry::Vacant(entry) = g_scores.entry(neighbor) {
+                entry.insert(g_score);
+                came_from.insert(neighbor, current);
+                let f_score = g_score + heuristic(neighbor, end);
+                f_scores.insert(neighbor, f_score);
+
+                open_set.push(Tile {
+                    position: neighbor,
+                    g_score,
+                    f_score,
+                    direction,
+                });
+            }
+        }
+    }
+    0
 }

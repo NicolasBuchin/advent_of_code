@@ -1,12 +1,12 @@
-use advent_of_code::warehouse_woes;
+use advent_of_code::reindeer_maze;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
 
-fn benchmark_warehouse_woes(c: &mut Criterion) {
+fn benchmark(c: &mut Criterion) {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    c.bench_function("warehouse_woes", |b| b.iter(|| warehouse_woes(black_box(&input))));
+    c.bench_function("reindeer_maze", |b| b.iter(|| reindeer_maze(black_box(&input))));
 }
 
-criterion_group!(benches, benchmark_warehouse_woes);
+criterion_group!(benches, benchmark);
 criterion_main!(benches);
