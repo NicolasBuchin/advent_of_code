@@ -1,10 +1,10 @@
-use advent_of_code::chronospatial_computer;
+use advent_of_code::ram_run;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    let solution = chronospatial_computer(&input);
-    assert_eq!(solution, 496);
+    let solution = ram_run(&input);
+    assert_eq!(solution, 22);
     println!("count: {}", solution);
 }
