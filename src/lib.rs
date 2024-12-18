@@ -1,22 +1,31 @@
 use std::{
     cmp::Ordering,
-    collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet},
+    collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet, VecDeque},
 };
 
 const WIDTH: usize = 70 + 1;
 const HEIGHT: usize = 70 + 1;
-const NUMBER: usize = 1024;
 
-pub fn ram_run(input: &str) -> usize {
-    let falling = parse(input);
+pub fn ram_run(input: &str) -> String {
+    let mut walls = parse(input);
+    let mut fallen = HashSet::new();
+    let mut path = find_path((0, 0), (WIDTH - 1, HEIGHT - 1), &fallen).unwrap();
 
-    let path = find_path((0, 0), (WIDTH - 1, HEIGHT - 1), &falling);
+    while let Some(wall) = walls.pop_front() {
+        fallen.insert(wall);
+        if path.contains(&wall) {
+            let new_path = find_path((0, 0), (WIDTH - 1, HEIGHT - 1), &fallen);
+            if new_path.is_none() {
+                return format!("{},{}", wall.0, wall.1);
+            }
+            path = new_path.unwrap();
+        }
+    }
 
-    show(&falling, &path);
-
-    path.len() - 1
+    "Not found!".to_owned()
 }
 
+#[allow(dead_code)]
 fn show(falling: &HashSet<(usize, usize)>, path: &HashSet<(usize, usize)>) {
     for j in 0..HEIGHT {
         for i in 0..WIDTH {
@@ -32,13 +41,13 @@ fn show(falling: &HashSet<(usize, usize)>, path: &HashSet<(usize, usize)>) {
     }
 }
 
-fn parse(input: &str) -> HashSet<(usize, usize)> {
+fn parse(input: &str) -> VecDeque<(usize, usize)> {
     let bytes = input.as_bytes();
 
-    let mut falling = HashSet::new();
+    let mut walls = VecDeque::new();
     let mut i = 0;
 
-    while i < bytes.len() && falling.len() < NUMBER {
+    while i < bytes.len() {
         let mut x = 0;
         while bytes[i] != b',' {
             x *= 10;
@@ -53,10 +62,10 @@ fn parse(input: &str) -> HashSet<(usize, usize)> {
             i += 1;
         }
         i += 1;
-        falling.insert((x, y));
+        walls.push_back((x, y));
     }
 
-    falling
+    walls
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -108,7 +117,7 @@ pub fn find_path(
     start: (usize, usize),
     end: (usize, usize),
     walls: &HashSet<(usize, usize)>,
-) -> HashSet<(usize, usize)> {
+) -> Option<HashSet<(usize, usize)>> {
     let mut open_set = BinaryHeap::new();
     let mut came_from: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
 
@@ -132,7 +141,7 @@ pub fn find_path(
                 current = previous_step;
             }
             steps.insert(start);
-            return steps;
+            return Some(steps);
         }
 
         for neighbor in get_neighbors(current, walls) {
@@ -152,5 +161,5 @@ pub fn find_path(
         }
     }
 
-    panic!("Cant find path!")
+    None
 }
