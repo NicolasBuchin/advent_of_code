@@ -7,9 +7,7 @@ pub fn linen_layout(input: &str) -> usize {
     let mut result = 0;
 
     words.iter().for_each(|&word| {
-        if tree.is_composable(word) {
-            result += 1;
-        }
+        result += tree.count_compositions(word);
     });
 
     result

@@ -138,4 +138,25 @@ impl TowelTree {
 
         dp[bytes.len()]
     }
+
+    pub fn count_compositions(&self, bytes: &[u8]) -> usize {
+        let mut dp = vec![0_usize; bytes.len() + 1];
+        dp[0] = 1;
+
+        for start in 0..bytes.len() {
+            if dp[start] == 0 {
+                continue;
+            }
+
+            let positions = self.find_end_positions(&bytes[start..]);
+
+            for &end_offset in &positions {
+                let end = start + end_offset;
+                if end <= bytes.len() {
+                    dp[end] = dp[end].saturating_add(dp[start]);
+                }
+            }
+        }
+        dp[bytes.len()]
+    }
 }

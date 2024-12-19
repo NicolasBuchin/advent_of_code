@@ -6,6 +6,6 @@ fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
     let solution = linen_layout(&input);
-    assert_eq!(solution, 336);
+    assert_eq!(solution, 758890600222015);
     println!("count: {}", solution);
 }
