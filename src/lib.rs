@@ -1,16 +1,11 @@
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use towel_tree::TowelTree;
 mod towel_tree;
 
 pub fn linen_layout(input: &str) -> usize {
     let (tree, words) = parse(input);
 
-    let mut result = 0;
-
-    words.iter().for_each(|&word| {
-        result += tree.count_compositions(word);
-    });
-
-    result
+    words.par_iter().map(|&word| tree.count_compositions(word)).sum()
 }
 
 fn parse(input: &str) -> (TowelTree, Vec<&[u8]>) {
@@ -19,6 +14,7 @@ fn parse(input: &str) -> (TowelTree, Vec<&[u8]>) {
     let mut start = 0;
 
     let mut i = 0;
+
     loop {
         while bytes[i] != b',' && bytes[i] != b'\n' {
             i += 1;

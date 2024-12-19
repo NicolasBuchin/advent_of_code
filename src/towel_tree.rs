@@ -160,3 +160,121 @@ impl TowelTree {
         dp[bytes.len()]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_tree() {
+        let tree = TowelTree::new();
+        assert!(!tree.contains(b"w"));
+        assert!(!tree.contains(b""));
+    }
+
+    #[test]
+    fn test_single_insertions() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+
+        assert!(tree.contains(b"w"));
+        assert!(!tree.contains(b"b"));
+        assert!(!tree.contains(b"wu"));
+    }
+
+    #[test]
+    fn test_multiple_insertions() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"wu");
+        tree.insert(b"wub");
+
+        assert!(tree.contains(b"w"));
+        assert!(tree.contains(b"wu"));
+        assert!(tree.contains(b"wub"));
+        assert!(!tree.contains(b"wubg"));
+    }
+
+    #[test]
+    fn test_all_characters() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"b");
+        tree.insert(b"u");
+        tree.insert(b"r");
+        tree.insert(b"g");
+
+        assert!(tree.contains(b"w"));
+        assert!(tree.contains(b"b"));
+        assert!(tree.contains(b"u"));
+        assert!(tree.contains(b"r"));
+        assert!(tree.contains(b"g"));
+    }
+
+    #[test]
+    fn test_find_end_positions() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"wu");
+        tree.insert(b"wub");
+
+        let positions = tree.find_end_positions(b"wub");
+        assert_eq!(positions, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_is_composable() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"wu");
+        tree.insert(b"ub");
+
+        assert!(tree.is_composable(b"wub"));
+        assert!(!tree.is_composable(b"wug"));
+    }
+
+    #[test]
+    fn test_count_compositions() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"wu");
+        tree.insert(b"ub");
+        tree.insert(b"uub");
+
+        assert_eq!(tree.count_compositions(b"wuub"), 2);
+        assert_eq!(tree.count_compositions(b"wug"), 0);
+    }
+
+    #[test]
+    fn test_overlapping_patterns() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"wb");
+        tree.insert(b"b");
+
+        assert_eq!(tree.count_compositions(b"wb"), 2);
+        assert!(tree.is_composable(b"wb"));
+    }
+
+    #[test]
+    #[should_panic(expected = "Not w, b, u, r or g!")]
+    fn test_invalid_character() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"x");
+    }
+
+    #[test]
+    fn test_long_sequence() {
+        let mut tree = TowelTree::new();
+        tree.insert(b"w");
+        tree.insert(b"u");
+        tree.insert(b"b");
+        tree.insert(b"wu");
+        tree.insert(b"wub");
+        tree.insert(b"ub");
+        tree.insert(b"bw");
+
+        assert!(tree.is_composable(b"wubwub"));
+        assert_eq!(tree.count_compositions(b"wubwub"), 20);
+    }
+}
