@@ -1,47 +1,24 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 const SCORE_AIM: usize = 100;
+const MAX_DISTANCE: usize = 20;
 
 pub fn race_condition(input: &str) -> usize {
-    let (road, walls) = parse(input);
+    let road = parse(input);
 
-    find_shortcuts(road, walls)
+    find_shortcuts(road)
 }
 
-fn find_shortcuts(road: HashMap<(usize, usize), usize>, walls: HashSet<(usize, usize)>) -> usize {
+fn find_shortcuts(road: Vec<((usize, usize), usize)>) -> usize {
     let mut shortcuts = 0;
 
-    for wall in walls {
-        let (x, y) = wall;
-        let mut scores = Vec::new();
-        if x > 0 {
-            if let Some(&score) = road.get(&(x - 1, y)) {
-                scores.push(score);
-            }
-        }
-        if y > 0 {
-            if let Some(&score) = road.get(&(x, y - 1)) {
-                for score_bis in &scores {
-                    if score_bis.abs_diff(score) > SCORE_AIM {
-                        shortcuts += 1;
-                    }
-                }
-                scores.push(score);
-            }
-        }
-        if let Some(&score) = road.get(&(x + 1, y)) {
-            for score_bis in &scores {
-                if score_bis.abs_diff(score) > SCORE_AIM {
-                    shortcuts += 1;
-                }
-            }
-            scores.push(score);
-        }
-        if let Some(&score) = road.get(&(x, y + 1)) {
-            for score_bis in &scores {
-                if score_bis.abs_diff(score) > SCORE_AIM {
-                    shortcuts += 1;
-                }
+    for i in 0..road.len() {
+        let (position, score) = road[i];
+        for other_tile in &road[i + 1..] {
+            let (other_position, other_score) = *other_tile;
+            let distance = distance(position, other_position);
+            if distance <= MAX_DISTANCE && score.abs_diff(other_score) - distance >= SCORE_AIM {
+                shortcuts += 1;
             }
         }
     }
@@ -49,11 +26,13 @@ fn find_shortcuts(road: HashMap<(usize, usize), usize>, walls: HashSet<(usize, u
     shortcuts
 }
 
-#[allow(clippy::type_complexity)]
-fn parse(input: &str) -> (HashMap<(usize, usize), usize>, HashSet<(usize, usize)>) {
+fn distance(p1: (usize, usize), p2: (usize, usize)) -> usize {
+    p1.0.abs_diff(p2.0) + p1.1.abs_diff(p2.1)
+}
+
+fn parse(input: &str) -> Vec<((usize, usize), usize)> {
     let bytes = input.as_bytes();
     let mut path = HashSet::new();
-    let mut walls = HashSet::new();
     let mut start = (0, 0);
     let mut end = (0, 0);
 
@@ -75,13 +54,11 @@ fn parse(input: &str) -> (HashMap<(usize, usize), usize>, HashSet<(usize, usize)
                 x += 1;
             }
             b'#' => {
-                if x != 0 && y != 0 {
-                    walls.insert((x, y));
-                }
                 x += 1;
             }
             b'S' => {
                 start = (x, y);
+                path.insert((x, y));
                 x += 1;
             }
             b'E' => {
@@ -94,7 +71,7 @@ fn parse(input: &str) -> (HashMap<(usize, usize), usize>, HashSet<(usize, usize)
         i += 1;
     }
 
-    let mut road = HashMap::new();
+    let mut road = Vec::new();
     let mut current = start;
     let mut score = 0;
 
@@ -102,31 +79,31 @@ fn parse(input: &str) -> (HashMap<(usize, usize), usize>, HashSet<(usize, usize)
         let (x, y) = current;
         score += 1;
         if x > 0 && path.contains(&(x - 1, y)) {
-            road.insert(current, score);
+            road.push((current, score));
             path.remove(&current);
             current = (x - 1, y);
             continue;
         }
         if y > 0 && path.contains(&(x, y - 1)) {
-            road.insert(current, score);
+            road.push((current, score));
             path.remove(&current);
             current = (x, y - 1);
             continue;
         }
         if path.contains(&(x + 1, y)) {
-            road.insert(current, score);
+            road.push((current, score));
             path.remove(&current);
             current = (x + 1, y);
             continue;
         }
         if path.contains(&(x, y + 1)) {
-            road.insert(current, score);
+            road.push((current, score));
             path.remove(&current);
             current = (x, y + 1);
             continue;
         }
     }
-    road.insert(current, score + 1);
+    road.push((current, score + 1));
 
-    (road, walls)
+    road
 }
