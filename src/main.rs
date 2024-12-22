@@ -1,10 +1,10 @@
-use advent_of_code::keypad_conundrum;
+use advent_of_code::monkey_market;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    let solution = keypad_conundrum(&input);
-    assert_eq!(solution, 223285811665866);
+    let solution = monkey_market(&input);
+    assert_eq!(solution, 16894083306);
     println!("count: {}", solution);
 }
