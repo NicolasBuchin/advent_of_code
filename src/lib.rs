@@ -1,28 +1,8 @@
-const NUMERIC_KEY_POSITIONS: [(usize, usize); 11] = [
-    (1, 3), // 0
-    (0, 2), // 1
-    (1, 2), // 2
-    (2, 2), // 3
-    (0, 1), // 4
-    (1, 1), // 5
-    (2, 1), // 6
-    (0, 0), // 7
-    (1, 0), // 8
-    (2, 0), // 9
-    (2, 3), // A
-];
-const DIRECTION_KEY_POSITIONS: [(usize, usize); 5] = [
-    (2, 0), // A
-    (1, 0), // ^
-    (0, 1), // <
-    (1, 1), // v
-    (2, 1), // >
-];
 const DEPTH: usize = 25;
 
 #[derive(Debug, Clone, Copy)]
 enum Key {
-    A = 0,
+    A = 0, // A
     N = 1, // ^
     W = 2, // <
     S = 3, // v
@@ -31,130 +11,235 @@ enum Key {
 
 pub fn keypad_conundrum(input: &str) -> usize {
     let cost_table = cost_table();
-    input
-        .lines()
-        .map(|line| {
-            let number: usize = line[0..3].parse().unwrap();
-            let mut position = 10;
-            line.bytes()
-                .map(|b| {
-                    let mut paths = Vec::new();
-                    let next_position = match b {
-                        b'A' => 10,
-                        _ => b as usize - 0x30,
-                    };
-                    get_path(
-                        NUMERIC_KEY_POSITIONS[position],
-                        NUMERIC_KEY_POSITIONS[next_position],
-                        (0, 3),
-                        &mut paths,
-                    );
-                    let cost: usize = paths
-                        .iter()
-                        .map(|path| {
-                            let mut position = 0;
-                            path.iter()
-                                .map(|&p| {
-                                    let next = p as usize;
-                                    let cost = cost_table[position * 5 + next];
-                                    position = next;
-                                    cost
-                                })
-                                .sum()
-                        })
-                        .min()
-                        .unwrap();
-                    position = next_position;
-                    cost
-                })
-                .sum::<usize>()
-                * number
-        })
-        .sum()
+    let mut total = 0;
+
+    for line in input.lines() {
+        let number: usize = line[0..3].parse().unwrap();
+        let mut position = 0;
+        let mut line_total = 0;
+
+        for b in line.bytes() {
+            let next_position = match b {
+                b'A' => 0,
+                _ => b as usize - 0x30 + 1,
+            };
+
+            let path = get_numerical_path(position, next_position);
+            let mut prev = 0;
+            let mut path_cost = 0;
+
+            for &p in path.iter() {
+                let next = p as usize;
+                let cost = cost_table[prev * 5 + next];
+                path_cost += cost;
+                prev = next;
+            }
+
+            line_total += path_cost;
+            position = next_position;
+        }
+
+        total += line_total * number;
+    }
+
+    total
 }
 
 fn cost_table() -> Vec<usize> {
-    let all_paths: Vec<_> = (0..DIRECTION_KEY_POSITIONS.len().pow(2))
-        .map(|i| {
-            let mut paths = Vec::new();
-            let start = i.div_euclid(DIRECTION_KEY_POSITIONS.len());
-            let end = i.rem_euclid(DIRECTION_KEY_POSITIONS.len());
-            get_path(
-                DIRECTION_KEY_POSITIONS[start],
-                DIRECTION_KEY_POSITIONS[end],
-                (0, 0),
-                &mut paths,
-            );
-            paths
-        })
-        .collect();
+    let mut all_paths = Vec::with_capacity(25);
+    for start in 0..5 {
+        for end in 0..5 {
+            let path = get_direction_path(start, end);
+            all_paths.push(path);
+        }
+    }
 
-    let mut min_path_costs: Vec<usize> = all_paths
-        .iter()
-        .map(|paths| paths.iter().map(|path| path.len()).min().unwrap())
-        .collect();
+    let mut min_path_costs: Vec<usize> = Vec::with_capacity(all_paths.len());
+    for path in all_paths.iter() {
+        min_path_costs.push(path.len());
+    }
 
-    for _ in 0..DEPTH - 1 {
+    for _ in 1..DEPTH {
         min_path_costs = new_path_cost(&min_path_costs, &all_paths);
     }
 
     min_path_costs
 }
 
-fn new_path_cost(previous_costs: &[usize], all_paths: &[Vec<Vec<Key>>]) -> Vec<usize> {
-    all_paths
-        .iter()
-        .map(|paths| {
-            paths
-                .iter()
-                .map(|path| {
-                    let mut position = 0;
-                    path.iter()
-                        .map(|&p| {
-                            let next = p as usize;
-                            let cost = previous_costs[position * 5 + next];
-                            position = next;
-                            cost
-                        })
-                        .sum()
-                })
-                .min()
-                .unwrap()
-        })
-        .collect()
-}
+fn new_path_cost(previous_costs: &[usize], all_paths: &[Vec<Key>]) -> Vec<usize> {
+    let mut result = Vec::with_capacity(all_paths.len());
 
-#[allow(clippy::comparison_chain)]
-fn get_path(start: (usize, usize), end: (usize, usize), forbidden: (usize, usize), paths: &mut Vec<Vec<Key>>) {
-    if start.0 != forbidden.0 || end.1 != forbidden.1 {
-        let mut path = Vec::new();
-        if start.1 < end.1 {
-            path.extend((start.1..end.1).map(|_| Key::S));
-        } else if start.1 > end.1 {
-            path.extend((end.1..start.1).map(|_| Key::N));
+    for path in all_paths {
+        let mut path_total = 0;
+        let mut prev = 0;
+
+        for &p in path {
+            let next = p as usize;
+            let cost = previous_costs[prev * 5 + next];
+            path_total += cost;
+            prev = next;
         }
-        if start.0 < end.0 {
-            path.extend((start.0..end.0).map(|_| Key::E));
-        } else if start.0 > end.0 {
-            path.extend((end.0..start.0).map(|_| Key::W));
-        }
-        path.push(Key::A);
-        paths.push(path);
+
+        result.push(path_total);
     }
 
-    if start.0 != end.0 && start.1 != end.1 && !(start.1 == forbidden.1 && end.0 == forbidden.0) {
-        let mut path = Vec::new();
-        if start.0 < end.0 {
-            path.extend((start.0..end.0).map(|_| Key::E));
-        } else if start.0 > end.0 {
-            path.extend((end.0..start.0).map(|_| Key::W));
-        }
-        if start.1 < end.1 {
-            path.extend((start.1..end.1).map(|_| Key::S));
-        } else if start.1 > end.1 {
-            path.extend((end.1..start.1).map(|_| Key::N));
-        }
-        path.push(Key::A);
-        paths.push(path);
+    result
+}
+
+fn get_direction_path(start: usize, end: usize) -> Vec<Key> {
+    match (start, end) {
+        (2, 2) => vec![Key::A],                         // < => <
+        (2, 0) => vec![Key::E, Key::E, Key::N, Key::A], // < => A
+        (2, 1) => vec![Key::E, Key::N, Key::A],         // < => ^
+        (2, 3) => vec![Key::E, Key::A],                 // < => v
+        (2, 4) => vec![Key::E, Key::E],                 // < => >
+        (4, 4) => vec![Key::A],                         // > => >
+        (4, 0) => vec![Key::N, Key::A],                 // > => A
+        (4, 1) => vec![Key::W, Key::N, Key::A],         // > => ^
+        (4, 3) => vec![Key::W, Key::A],                 // > => v
+        (4, 2) => vec![Key::W, Key::W],                 // > => <
+        (0, 2) => vec![Key::S, Key::W, Key::W, Key::A], // A => <
+        (0, 4) => vec![Key::S, Key::A],                 // A => >
+        (0, 0) => vec![Key::A],                         // A => A
+        (0, 1) => vec![Key::W, Key::A],                 // A => ^
+        (0, 3) => vec![Key::W, Key::S, Key::A],         // A => v
+        (1, 2) => vec![Key::S, Key::W, Key::A],         // ^ => <
+        (1, 4) => vec![Key::S, Key::E, Key::A],         // ^ => >
+        (1, 0) => vec![Key::E, Key::A],                 // ^ => A
+        (1, 1) => vec![Key::A],                         // ^ => ^
+        (1, 3) => vec![Key::S],                         // ^ => v
+        (3, 2) => vec![Key::W, Key::A],                 // v => <
+        (3, 4) => vec![Key::E, Key::A],                 // v => >
+        (3, 0) => vec![Key::N, Key::E, Key::A],         // v => A
+        (3, 3) => vec![Key::A],                         // v => v
+        (3, 1) => vec![Key::N],                         // v => ^
+        _ => unreachable!(),
+    }
+}
+
+fn get_numerical_path(start: usize, end: usize) -> Vec<Key> {
+    match (start, end) {
+        (1, 1) => vec![Key::A],                                         // 0 => 0
+        (1, 2) => vec![Key::N, Key::W, Key::A],                         // 0 => 1
+        (1, 3) => vec![Key::N, Key::A],                                 // 0 => 2
+        (1, 4) => vec![Key::N, Key::E, Key::A],                         // 0 => 3
+        (1, 5) => vec![Key::N, Key::N, Key::W, Key::A],                 // 0 => 4
+        (1, 6) => vec![Key::N, Key::N, Key::A],                         // 0 => 5
+        (1, 7) => vec![Key::N, Key::N, Key::E, Key::A],                 // 0 => 6
+        (1, 8) => vec![Key::N, Key::N, Key::N, Key::W, Key::A],         // 0 => 7
+        (1, 9) => vec![Key::N, Key::N, Key::N, Key::A],                 // 0 => 8
+        (1, 10) => vec![Key::N, Key::N, Key::N, Key::E, Key::A],        // 0 => 9
+        (1, 0) => vec![Key::E, Key::A],                                 // 0 => A
+        (2, 1) => vec![Key::E, Key::S, Key::A],                         // 1 => 0
+        (2, 2) => vec![Key::A],                                         // 1 => 1
+        (2, 3) => vec![Key::E, Key::A],                                 // 1 => 2
+        (2, 4) => vec![Key::E, Key::E, Key::A],                         // 1 => 3
+        (2, 5) => vec![Key::N, Key::A],                                 // 1 => 4
+        (2, 6) => vec![Key::N, Key::E, Key::A],                         // 1 => 5
+        (2, 7) => vec![Key::N, Key::E, Key::E, Key::A],                 // 1 => 6
+        (2, 8) => vec![Key::N, Key::N, Key::A],                         // 1 => 7
+        (2, 9) => vec![Key::N, Key::N, Key::E, Key::A],                 // 1 => 8
+        (2, 10) => vec![Key::N, Key::N, Key::E, Key::E, Key::A],        // 1 => 9
+        (2, 0) => vec![Key::E, Key::E, Key::S, Key::A],                 // 1 => A
+        (3, 1) => vec![Key::S, Key::A],                                 // 2 => 0
+        (3, 2) => vec![Key::W, Key::A],                                 // 2 => 1
+        (3, 3) => vec![Key::A],                                         // 2 => 2
+        (3, 4) => vec![Key::E, Key::A],                                 // 2 => 3
+        (3, 5) => vec![Key::W, Key::N, Key::A],                         // 2 => 4
+        (3, 6) => vec![Key::N, Key::A],                                 // 2 => 5
+        (3, 7) => vec![Key::N, Key::E, Key::A],                         // 2 => 6
+        (3, 8) => vec![Key::W, Key::N, Key::N, Key::A],                 // 2 => 7
+        (3, 9) => vec![Key::N, Key::N, Key::A],                         // 2 => 8
+        (3, 10) => vec![Key::N, Key::N, Key::E, Key::A],                // 2 => 9
+        (3, 0) => vec![Key::S, Key::E, Key::A],                         // 2 => A
+        (4, 1) => vec![Key::W, Key::S, Key::A],                         // 3 => 0
+        (4, 2) => vec![Key::W, Key::W, Key::A],                         // 3 => 1
+        (4, 3) => vec![Key::W, Key::A],                                 // 3 => 2
+        (4, 4) => vec![Key::A],                                         // 3 => 3
+        (4, 5) => vec![Key::W, Key::W, Key::N, Key::A],                 // 3 => 4
+        (4, 6) => vec![Key::W, Key::N, Key::A],                         // 3 => 5
+        (4, 7) => vec![Key::N, Key::A],                                 // 3 => 6
+        (4, 8) => vec![Key::W, Key::W, Key::N, Key::N, Key::A],         // 3 => 7
+        (4, 9) => vec![Key::W, Key::N, Key::N, Key::A],                 // 3 => 8
+        (4, 10) => vec![Key::N, Key::N, Key::A],                        // 3 => 9
+        (4, 0) => vec![Key::S, Key::A],                                 // 3 => A
+        (5, 1) => vec![Key::E, Key::S, Key::S, Key::A],                 // 4 => 0
+        (5, 2) => vec![Key::S, Key::A],                                 // 4 => 1
+        (5, 3) => vec![Key::S, Key::E, Key::A],                         // 4 => 2
+        (5, 4) => vec![Key::S, Key::E, Key::E, Key::A],                 // 4 => 3
+        (5, 5) => vec![Key::A],                                         // 4 => 4
+        (5, 6) => vec![Key::E, Key::A],                                 // 4 => 5
+        (5, 7) => vec![Key::E, Key::E, Key::A],                         // 4 => 6
+        (5, 8) => vec![Key::N, Key::A],                                 // 4 => 7
+        (5, 9) => vec![Key::N, Key::E, Key::A],                         // 4 => 8
+        (5, 10) => vec![Key::N, Key::E, Key::E, Key::A],                // 4 => 9
+        (5, 0) => vec![Key::E, Key::E, Key::S, Key::S, Key::A],         // 4 => A
+        (6, 1) => vec![Key::S, Key::S, Key::A],                         // 5 => 0
+        (6, 2) => vec![Key::W, Key::S, Key::A],                         // 5 => 1
+        (6, 3) => vec![Key::S, Key::A],                                 // 5 => 2
+        (6, 4) => vec![Key::S, Key::E, Key::A],                         // 5 => 3
+        (6, 5) => vec![Key::W, Key::A],                                 // 5 => 4
+        (6, 6) => vec![Key::A],                                         // 5 => 5
+        (6, 7) => vec![Key::E, Key::A],                                 // 5 => 6
+        (6, 8) => vec![Key::W, Key::N, Key::A],                         // 5 => 7
+        (6, 9) => vec![Key::N, Key::A],                                 // 5 => 8
+        (6, 10) => vec![Key::N, Key::E, Key::A],                        // 5 => 9
+        (6, 0) => vec![Key::S, Key::S, Key::E, Key::A],                 // 5 => A
+        (7, 1) => vec![Key::W, Key::S, Key::S, Key::A],                 // 6 => 0
+        (7, 2) => vec![Key::W, Key::W, Key::S, Key::A],                 // 6 => 1
+        (7, 3) => vec![Key::W, Key::S, Key::A],                         // 6 => 2
+        (7, 4) => vec![Key::S, Key::A],                                 // 6 => 3
+        (7, 5) => vec![Key::W, Key::W, Key::A],                         // 6 => 4
+        (7, 6) => vec![Key::W, Key::A],                                 // 6 => 5
+        (7, 7) => vec![Key::A],                                         // 6 => 6
+        (7, 8) => vec![Key::W, Key::W, Key::N, Key::A],                 // 6 => 7
+        (7, 9) => vec![Key::W, Key::N, Key::A],                         // 6 => 8
+        (7, 10) => vec![Key::N, Key::A],                                // 6 => 9
+        (7, 0) => vec![Key::S, Key::S, Key::A],                         // 6 => A
+        (8, 1) => vec![Key::E, Key::S, Key::S, Key::S, Key::A],         // 7 => 0
+        (8, 2) => vec![Key::S, Key::S, Key::A],                         // 7 => 1
+        (8, 3) => vec![Key::S, Key::S, Key::E, Key::A],                 // 7 => 2
+        (8, 4) => vec![Key::S, Key::S, Key::E, Key::E, Key::A],         // 7 => 3
+        (8, 5) => vec![Key::S, Key::A],                                 // 7 => 4
+        (8, 6) => vec![Key::S, Key::E, Key::A],                         // 7 => 5
+        (8, 7) => vec![Key::S, Key::E, Key::E, Key::A],                 // 7 => 6
+        (8, 8) => vec![Key::A],                                         // 7 => 7
+        (8, 9) => vec![Key::E, Key::A],                                 // 7 => 8
+        (8, 10) => vec![Key::E, Key::E, Key::A],                        // 7 => 9
+        (8, 0) => vec![Key::E, Key::E, Key::S, Key::S, Key::S, Key::A], // 7 => A
+        (9, 1) => vec![Key::S, Key::S, Key::S, Key::A],                 // 8 => 0
+        (9, 2) => vec![Key::W, Key::S, Key::S, Key::A],                 // 8 => 1
+        (9, 3) => vec![Key::S, Key::S, Key::A],                         // 8 => 2
+        (9, 4) => vec![Key::S, Key::S, Key::E, Key::A],                 // 8 => 3
+        (9, 5) => vec![Key::W, Key::S, Key::A],                         // 8 => 4
+        (9, 6) => vec![Key::S, Key::A],                                 // 8 => 5
+        (9, 7) => vec![Key::S, Key::E, Key::A],                         // 8 => 6
+        (9, 8) => vec![Key::W, Key::A],                                 // 8 => 7
+        (9, 9) => vec![Key::A],                                         // 8 => 8
+        (9, 10) => vec![Key::E, Key::A],                                // 8 => 9
+        (9, 0) => vec![Key::S, Key::S, Key::S, Key::E, Key::A],         // 8 => A
+        (10, 1) => vec![Key::W, Key::S, Key::S, Key::S, Key::A],        // 9 => 0
+        (10, 2) => vec![Key::W, Key::W, Key::S, Key::S, Key::A],        // 9 => 1
+        (10, 3) => vec![Key::W, Key::S, Key::S, Key::A],                // 9 => 2
+        (10, 4) => vec![Key::S, Key::S, Key::A],                        // 9 => 3
+        (10, 5) => vec![Key::W, Key::W, Key::S, Key::A],                // 9 => 4
+        (10, 6) => vec![Key::W, Key::S, Key::A],                        // 9 => 5
+        (10, 7) => vec![Key::S, Key::A],                                // 9 => 6
+        (10, 8) => vec![Key::W, Key::W, Key::A],                        // 9 => 7
+        (10, 9) => vec![Key::W, Key::A],                                // 9 => 8
+        (10, 10) => vec![Key::A],                                       // 9 => 9
+        (10, 0) => vec![Key::S, Key::S, Key::S, Key::A],                // 9 => A
+        (0, 1) => vec![Key::W, Key::A],                                 // A => 0
+        (0, 2) => vec![Key::N, Key::W, Key::W, Key::A],                 // A => 1
+        (0, 3) => vec![Key::W, Key::N, Key::A],                         // A => 2
+        (0, 4) => vec![Key::N, Key::A],                                 // A => 3
+        (0, 5) => vec![Key::N, Key::N, Key::W, Key::W, Key::A],         // A => 4
+        (0, 6) => vec![Key::W, Key::N, Key::N, Key::A],                 // A => 5
+        (0, 7) => vec![Key::N, Key::N, Key::A],                         // A => 6
+        (0, 8) => vec![Key::N, Key::N, Key::N, Key::W, Key::W, Key::A], // A => 7
+        (0, 9) => vec![Key::W, Key::N, Key::N, Key::N, Key::A],         // A => 8
+        (0, 10) => vec![Key::N, Key::N, Key::N, Key::A],                // A => 9
+        (0, 0) => vec![Key::A],                                         // A => A
+        _ => unreachable!(),
     }
 }
