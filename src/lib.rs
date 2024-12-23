@@ -1,63 +1,41 @@
-use rayon::prelude::*;
-use std::sync::atomic::{AtomicI32, Ordering};
-
-const DEPTH: usize = 2000;
-
-pub fn monkey_market(input: &str) -> usize {
-    let scores_table = [const { AtomicI32::new(0) }; 19 * 19 * 19 * 19];
-
-    let seeds: Vec<i32> = input.lines().map(|line| line.parse().unwrap()).collect();
-
-    seeds.par_iter().for_each(|&seed| {
-        evaluate_parallel(seed, DEPTH, &scores_table);
-    });
-
-    get_best_score(&scores_table)
+pub fn lan_party(input: &str) -> usize {
+    let mut connection_table = [[false; 26 * 26]; 26 * 26];
+    parse(input, &mut connection_table);
+    find_triples_with_t(&mut connection_table)
 }
 
-fn get_best_score(scores_table: &[AtomicI32]) -> usize {
-    scores_table
-        .par_iter()
-        .map(|score| score.load(Ordering::Relaxed))
-        .max()
-        .unwrap_or(0) as usize
-}
+fn parse(input: &str, connection_table: &mut [[bool; 26 * 26]]) {
+    let bytes = input.as_bytes();
+    let mut i = 0;
 
-fn evaluate_parallel(mut seed: i32, depth: usize, scores_table: &[AtomicI32]) {
-    let mut prev_price = seed.rem_euclid(10);
-    let mut sequences_todo = [true; 19 * 19 * 19 * 19];
-    let mut sequence = [0, 0, 0, 0];
-
-    for i in 0..4 {
-        advance(&mut seed);
-        let price = seed.rem_euclid(10);
-        sequence[i] = (price - prev_price + 9) as usize;
-        prev_price = price;
+    while i < bytes.len() {
+        let left = (bytes[i] - b'a') as usize * 26 + (bytes[i + 1] - b'a') as usize;
+        let right = (bytes[i + 3] - b'a') as usize * 26 + (bytes[i + 4] - b'a') as usize;
+        connection_table[left][right] = true;
+        connection_table[right][left] = true;
+        i += 6;
     }
+}
 
-    for _ in 4..depth {
-        advance(&mut seed);
-        let price = seed.rem_euclid(10);
-
-        sequence[0] = sequence[1];
-        sequence[1] = sequence[2];
-        sequence[2] = sequence[3];
-        sequence[3] = (price - prev_price + 9) as usize;
-
-        let index = sequence[0] + sequence[1] * 19 + sequence[2] * 361 + sequence[3] * 6859;
-        if sequences_todo[index] {
-            scores_table[index].fetch_add(price, Ordering::Relaxed);
-            sequences_todo[index] = false;
+fn find_triples_with_t(connection_table: &mut [[bool; 26 * 26]]) -> usize {
+    let mut triples_with_t = 0;
+    for t in 0..26 {
+        let t = 19 * 26 + t;
+        for x in 0..26 * 26 {
+            if connection_table[t][x] {
+                for y in 0..26 * 26 {
+                    if connection_table[x][y] && connection_table[y][t] {
+                        // println!("{}-{}-{}", translate(t), translate(x), translate(y));
+                        triples_with_t += 1;
+                    }
+                }
+            }
+            connection_table[x][t] = false;
         }
-        prev_price = price;
     }
+    triples_with_t
 }
 
-fn advance(seed: &mut i32) {
-    *seed ^= *seed << 6;
-    *seed &= 0xFFFFFF;
-    *seed ^= *seed >> 5;
-    *seed &= 0xFFFFFF;
-    *seed ^= *seed << 11;
-    *seed &= 0xFFFFFF;
-}
+// fn translate(n: usize) -> String {
+//     String::from_utf8(vec![n.div_euclid(26) as u8 + b'a', n.rem_euclid(26) as u8 + b'a']).unwrap()
+// }
