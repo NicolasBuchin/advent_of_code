@@ -1,124 +1,106 @@
-pub fn lan_party(input: &str) -> String {
-    let connection_table = parse(input);
+use std::collections::HashMap;
 
-    let triples = find_triples(&connection_table);
-
-    let best_set = find_larget_connection_set(triples, &connection_table);
-
-    translate(best_set)
+pub fn crossed_wires(input: &str) -> usize {
+    let (mut operation_table, output_size) = parse(input);
+    solve(&mut operation_table, output_size)
 }
 
-fn parse(input: &str) -> [[bool; 26 * 26]; 26 * 26] {
+enum Op {
+    And([u8; 3], [u8; 3]),
+    Or([u8; 3], [u8; 3]),
+    Xor([u8; 3], [u8; 3]),
+    Value(bool),
+}
+
+fn solve(operation_table: &mut HashMap<[u8; 3], Op>, output_size: usize) -> usize {
+    let mut output = 0;
+    for i in 0..output_size {
+        let key = [b'z', i.div_euclid(10) as u8 + b'0', i.rem_euclid(10) as u8 + b'0'];
+        let value = get_value_of(key, operation_table);
+        if value {
+            output |= 1 << i;
+        }
+    }
+    output
+}
+
+fn get_value_of(key: [u8; 3], operation_table: &mut HashMap<[u8; 3], Op>) -> bool {
+    if let Some(op) = operation_table.remove(&key) {
+        let value = match op {
+            Op::And(left, right) => {
+                let left_value = get_value_of(left, operation_table);
+                let right_value = get_value_of(right, operation_table);
+                left_value && right_value
+            }
+            Op::Or(left, right) => {
+                let left_value = get_value_of(left, operation_table);
+                let right_value = get_value_of(right, operation_table);
+                left_value || right_value
+            }
+            Op::Xor(left, right) => {
+                let left_value = get_value_of(left, operation_table);
+                let right_value = get_value_of(right, operation_table);
+                left_value ^ right_value
+            }
+            Op::Value(value) => value,
+        };
+        operation_table.insert(key, Op::Value(value));
+        value
+    } else {
+        panic!("Key not found in operation_table");
+    }
+}
+
+fn parse(input: &str) -> (HashMap<[u8; 3], Op>, usize) {
     let bytes = input.as_bytes();
-    let mut connection_table = [[false; 26 * 26]; 26 * 26];
+    let mut operation_table = HashMap::new();
     let mut i = 0;
+
+    while bytes[i] != b'\n' {
+        let key = [bytes[i], bytes[i + 1], bytes[i + 2]];
+        let value = Op::Value(bytes[i + 5] == b'1');
+        operation_table.insert(key, value);
+        i += 7;
+    }
+
+    i += 1;
+    let mut output_size = 0;
 
     while i < bytes.len() {
-        let left = (bytes[i] - b'a') as usize * 26 + (bytes[i + 1] - b'a') as usize;
-        let right = (bytes[i + 3] - b'a') as usize * 26 + (bytes[i + 4] - b'a') as usize;
-        connection_table[left][right] = true;
-        connection_table[right][left] = true;
-        i += 6;
-    }
-    connection_table
-}
-
-fn find_triples(connection_table: &[[bool; 26 * 26]; 26 * 26]) -> Vec<Vec<usize>> {
-    let mut connection_table = *connection_table;
-    let mut triples_with_t = Vec::new();
-    for x in 0..26 * 26 {
-        for y in 0..26 * 26 {
-            if connection_table[x][y] {
-                for z in 0..26 * 26 {
-                    if connection_table[y][z] && connection_table[z][x] {
-                        triples_with_t.push(vec![x, y, z]);
-                    }
-                }
+        let value = match bytes[i + 4] {
+            b'A' => {
+                i += 15;
+                Op::And(
+                    [bytes[i - 15], bytes[i - 14], bytes[i - 13]],
+                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
+                )
             }
-            connection_table[y][x] = false;
-        }
-    }
-    triples_with_t
-}
-
-fn find_larget_connection_set(sets: Vec<Vec<usize>>, connection_table: &[[bool; 26 * 26]]) -> Vec<usize> {
-    let mut best_sets: Vec<Vec<usize>> = Vec::new();
-    for s1 in sets {
-        let mut to_add = true;
-        for s2 in &mut best_sets {
-            if let Some(set) = merge_sets(&s1, s2, connection_table) {
-                *s2 = set;
-                to_add = false;
-                break;
+            b'O' => {
+                i += 14;
+                Op::Or(
+                    [bytes[i - 14], bytes[i - 13], bytes[i - 12]],
+                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
+                )
+            }
+            b'X' => {
+                i += 15;
+                Op::Xor(
+                    [bytes[i - 15], bytes[i - 14], bytes[i - 13]],
+                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
+                )
+            }
+            _ => unreachable!(),
+        };
+        let key = [bytes[i], bytes[i + 1], bytes[i + 2]];
+        if key[0] == b'z' {
+            let size = (bytes[i + 1] - b'0') as usize * 10 + (bytes[i + 2] - b'0') as usize;
+            if size > output_size {
+                output_size = size;
             }
         }
-        if to_add {
-            best_sets.push(s1);
-        }
+        operation_table.insert(key, value);
+        i += 4;
     }
 
-    let mut best = &best_sets[0];
-    for set in &best_sets {
-        if set.len() > best.len() {
-            best = set;
-        }
-    }
-
-    best.clone()
-}
-
-fn merge_sets(set1: &[usize], set2: &[usize], connection_table: &[[bool; 26 * 26]]) -> Option<Vec<usize>> {
-    for &x in set1 {
-        for &y in set2 {
-            if x != y && !connection_table[x][y] {
-                return None;
-            }
-        }
-    }
-
-    let mut result = Vec::new();
-    let mut i = 0;
-    let mut j = 0;
-
-    while i < set1.len() && j < set2.len() {
-        let x = set1[i];
-        let y = set2[j];
-        match x.cmp(&y) {
-            std::cmp::Ordering::Less => {
-                result.push(x);
-                i += 1;
-            }
-            std::cmp::Ordering::Equal => {
-                result.push(x);
-                i += 1;
-                j += 1;
-            }
-            std::cmp::Ordering::Greater => {
-                result.push(y);
-                j += 1;
-            }
-        }
-    }
-    while i < set1.len() {
-        result.push(set1[i]);
-        i += 1;
-    }
-    while j < set2.len() {
-        result.push(set2[j]);
-        j += 1;
-    }
-
-    Some(result)
-}
-
-fn translate(set: Vec<usize>) -> String {
-    let mut ns = Vec::with_capacity(set.len() * 3);
-    for &n in &set {
-        if n != set[0] {
-            ns.push(b',');
-        }
-        ns.push(n.div_euclid(26) as u8 + b'a');
-        ns.push(n.rem_euclid(26) as u8 + b'a');
-    }
-    String::from_utf8(ns).unwrap()
+    (operation_table, output_size + 1)
 }
