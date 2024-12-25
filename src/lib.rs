@@ -1,106 +1,95 @@
-use std::collections::HashMap;
+use std::{cmp::Reverse, collections::BinaryHeap};
 
-pub fn crossed_wires(input: &str) -> usize {
-    let (mut operation_table, output_size) = parse(input);
-    solve(&mut operation_table, output_size)
+pub fn crossed_wires(input: &str) -> String {
+    let instructions = parse(input);
+    solve(&instructions)
 }
 
+#[derive(PartialEq, Debug)]
 enum Op {
-    And([u8; 3], [u8; 3]),
-    Or([u8; 3], [u8; 3]),
-    Xor([u8; 3], [u8; 3]),
-    Value(bool),
+    And,
+    Or,
+    Xor,
 }
 
-fn solve(operation_table: &mut HashMap<[u8; 3], Op>, output_size: usize) -> usize {
-    let mut output = 0;
-    for i in 0..output_size {
-        let key = [b'z', i.div_euclid(10) as u8 + b'0', i.rem_euclid(10) as u8 + b'0'];
-        let value = get_value_of(key, operation_table);
-        if value {
-            output |= 1 << i;
+#[derive(Debug)]
+struct Instruction {
+    left: [u8; 3],
+    right: [u8; 3],
+    op: Op,
+    destination: [u8; 3],
+}
+
+fn solve(instructions: &[Instruction]) -> String {
+    let mut wrong_gates = BinaryHeap::new();
+    for instruction in instructions {
+        if (instruction.destination[0] == b'z'
+            && instruction.op != Op::Xor
+            && instruction.destination != [b'z', b'4', b'5'])
+            || (instruction.destination[0] != b'z'
+                && instruction.left[0] + instruction.right[0] != 0xF1
+                && instruction.op == Op::Xor)
+            || (instruction.op == Op::Xor
+                && instruction.left[0] + instruction.right[0] == 0xF1
+                && instruction.destination != [b'z', b'0', b'0']
+                && !instructions.iter().any(|i| {
+                    i.op == Op::Xor && (i.left == instruction.destination || i.right == instruction.destination)
+                }))
+            || (instruction.op == Op::And
+                && instruction.left != [b'y', b'0', b'0']
+                && !instructions.iter().any(|i| {
+                    i.op == Op::Or && (i.left == instruction.destination || i.right == instruction.destination)
+                }))
+        {
+            wrong_gates.push(Reverse(instruction.destination));
         }
     }
-    output
-}
-
-fn get_value_of(key: [u8; 3], operation_table: &mut HashMap<[u8; 3], Op>) -> bool {
-    if let Some(op) = operation_table.remove(&key) {
-        let value = match op {
-            Op::And(left, right) => {
-                let left_value = get_value_of(left, operation_table);
-                let right_value = get_value_of(right, operation_table);
-                left_value && right_value
-            }
-            Op::Or(left, right) => {
-                let left_value = get_value_of(left, operation_table);
-                let right_value = get_value_of(right, operation_table);
-                left_value || right_value
-            }
-            Op::Xor(left, right) => {
-                let left_value = get_value_of(left, operation_table);
-                let right_value = get_value_of(right, operation_table);
-                left_value ^ right_value
-            }
-            Op::Value(value) => value,
-        };
-        operation_table.insert(key, Op::Value(value));
-        value
-    } else {
-        panic!("Key not found in operation_table");
+    let mut gates_bytes = Vec::new();
+    while let Some(Reverse(bytes)) = wrong_gates.pop() {
+        if !gates_bytes.is_empty() {
+            gates_bytes.push(b',');
+        }
+        gates_bytes.extend_from_slice(&bytes);
     }
+    String::from_utf8(gates_bytes).unwrap()
 }
 
-fn parse(input: &str) -> (HashMap<[u8; 3], Op>, usize) {
+fn parse(input: &str) -> Vec<Instruction> {
     let bytes = input.as_bytes();
-    let mut operation_table = HashMap::new();
+    let mut instructions = Vec::new();
     let mut i = 0;
 
     while bytes[i] != b'\n' {
-        let key = [bytes[i], bytes[i + 1], bytes[i + 2]];
-        let value = Op::Value(bytes[i + 5] == b'1');
-        operation_table.insert(key, value);
         i += 7;
     }
-
     i += 1;
-    let mut output_size = 0;
 
     while i < bytes.len() {
-        let value = match bytes[i + 4] {
+        let left = [bytes[i], bytes[i + 1], bytes[i + 2]];
+        let op = match bytes[i + 4] {
             b'A' => {
-                i += 15;
-                Op::And(
-                    [bytes[i - 15], bytes[i - 14], bytes[i - 13]],
-                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
-                )
+                i += 8;
+                Op::And
             }
             b'O' => {
-                i += 14;
-                Op::Or(
-                    [bytes[i - 14], bytes[i - 13], bytes[i - 12]],
-                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
-                )
+                i += 7;
+                Op::Or
             }
             b'X' => {
-                i += 15;
-                Op::Xor(
-                    [bytes[i - 15], bytes[i - 14], bytes[i - 13]],
-                    [bytes[i - 7], bytes[i - 6], bytes[i - 5]],
-                )
+                i += 8;
+                Op::Xor
             }
             _ => unreachable!(),
         };
-        let key = [bytes[i], bytes[i + 1], bytes[i + 2]];
-        if key[0] == b'z' {
-            let size = (bytes[i + 1] - b'0') as usize * 10 + (bytes[i + 2] - b'0') as usize;
-            if size > output_size {
-                output_size = size;
-            }
-        }
-        operation_table.insert(key, value);
-        i += 4;
+        let right = [bytes[i], bytes[i + 1], bytes[i + 2]];
+        let destination = [bytes[i + 7], bytes[i + 8], bytes[i + 9]];
+        instructions.push(Instruction {
+            left,
+            right,
+            op,
+            destination,
+        });
+        i += 11;
     }
-
-    (operation_table, output_size + 1)
+    instructions
 }

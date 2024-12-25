@@ -5,6 +5,6 @@ fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
     let solution = crossed_wires(&input);
-    assert_eq!(solution, 56620966442854);
+    assert_eq!(solution, "chv,jpj,kgj,rts,vvw,z07,z12,z26");
     println!("count: {}", solution);
 }
