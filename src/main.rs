@@ -1,10 +1,10 @@
-use advent_of_code::crossed_wires;
+use advent_of_code::code_chronicle;
 use std::fs::{self};
 
 fn main() {
     let input = fs::read_to_string("input.txt").unwrap();
     let input = input.replace('\r', "");
-    let solution = crossed_wires(&input);
-    assert_eq!(solution, "chv,jpj,kgj,rts,vvw,z07,z12,z26");
+    let solution = code_chronicle(&input);
+    assert_eq!(solution, 3483);
     println!("count: {}", solution);
 }
